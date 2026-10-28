@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "data": "node scripts/convert-excel.mjs",
+    "check": "node --no-warnings scripts/check-scenarios.mjs",
     "prebuild": "npm run data",
     "build": "next build",
     "start": "next start",
