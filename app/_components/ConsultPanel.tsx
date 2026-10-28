@@ -31,7 +31,11 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
   function runRecommend() {
     const selection: Selection = { buttons, keyword, mode };
     const error = validateSelection(selection);
-    setOutcome(error ? { kind: "error", error } : { kind: "done", items: recommend(data.items, selection), selection });
+    setOutcome(
+      error
+        ? { kind: "error", error }
+        : { kind: "done", items: recommend(data.items, selection), selection, careIndex: Math.floor(Math.random() * 3) },
+    );
   }
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 // ④ 추천 자료: 카드 최대 3장, 0건 안내, 입력 오류 안내. PRD 5절 must 1 규칙 1·3·5
+import { CARE_MESSAGES, HARD_TEMPERATURES } from "@/lib/careMessages";
 import type { CounselItem, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
 import { useCopy } from "./useCopy";
@@ -7,7 +8,8 @@ import { useCopy } from "./useCopy";
 export type Outcome =
   | { kind: "idle" }
   | { kind: "error"; error: InputError }
-  | { kind: "done"; items: CounselItem[]; selection: Selection };
+  /** careIndex: 강성·악성일 때 보여 줄 마음지킴 문구 번호(추천 받을 때 하나 고름) */
+  | { kind: "done"; items: CounselItem[]; selection: Selection; careIndex: number };
 
 export default function ResultCards({ outcome }: { outcome: Outcome }) {
   if (outcome.kind === "idle") {
@@ -20,26 +22,39 @@ export default function ResultCards({ outcome }: { outcome: Outcome }) {
       </p>
     );
   }
+  // 온도가 강성·악성이면 "하면 안 되는 말"과 마음지킴 안내를 함께 보여 준다. PRD 5절 nice
+  const hard = HARD_TEMPERATURES.includes(outcome.selection.buttons["온도"] ?? "");
+  const care = hard && (
+    <aside className="rounded-lg bg-violet-50 p-3 text-sm text-violet-900 dark:bg-violet-950 dark:text-violet-200">
+      <span className="font-semibold">통화 후 마음지킴</span> {CARE_MESSAGES[outcome.careIndex % CARE_MESSAGES.length]}
+    </aside>
+  );
   if (outcome.items.length === 0) {
     return (
-      <p role="status" className="rounded-lg bg-amber-50 p-3 font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-        해당 자료 없음 — 사내 LLM 검토 필요
-      </p>
+      <div className="flex flex-col gap-3">
+        <p role="status" className="rounded-lg bg-amber-50 p-3 font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          해당 자료 없음 — 사내 LLM 검토 필요
+        </p>
+        {care}
+      </div>
     );
   }
   return (
-    <ol className="flex flex-col gap-3" aria-label="추천 자료">
-      {outcome.items.map((item, i) => (
-        <li key={item.id}>
-          <ResultCard item={item} rank={i + 1} />
-        </li>
-      ))}
-    </ol>
+    <div className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-3" aria-label="추천 자료">
+        {outcome.items.map((item, i) => (
+          <li key={item.id}>
+            <ResultCard item={item} rank={i + 1} showDoNotSay={hard} />
+          </li>
+        ))}
+      </ol>
+      {care}
+    </div>
   );
 }
 
 /** 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2 */
-function ResultCard({ item, rank }: { item: CounselItem; rank: number }) {
+function ResultCard({ item, rank, showDoNotSay }: { item: CounselItem; rank: number; showDoNotSay: boolean }) {
   const { label, url } = splitSource(item.source);
   return (
     <article className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
@@ -47,6 +62,11 @@ function ResultCard({ item, rank }: { item: CounselItem; rank: number }) {
         {rank}. {item.question}
       </h3>
       <p className="leading-relaxed">{item.summary}</p>
+      {showDoNotSay && item.doNotSay && (
+        <p className="rounded-md bg-red-50 px-2 py-1 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+          <span className="font-semibold">하면 안 되는 말</span> &quot;{item.doNotSay}&quot;
+        </p>
+      )}
       {item.words && <WordChips words={item.words} />}
       {item.handOff && (
         <p className="text-sm">
