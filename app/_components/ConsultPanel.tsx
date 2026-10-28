@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { ButtonKey, CounselData, Selection } from "@/lib/types";
 import ButtonGroups from "./ButtonGroups";
+import KeywordInput from "./KeywordInput";
 
 export default function ConsultPanel({ data }: { data: CounselData }) {
   const [buttons, setButtons] = useState<Selection["buttons"]>({});
+  const [keyword, setKeyword] = useState("");
 
   function chooseButton(key: ButtonKey, choice: string | undefined) {
     setButtons(prev => ({ ...prev, [key]: choice }));
@@ -22,7 +24,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       </Section>
 
       <Section title="키워드">
-        <p className="text-sm text-zinc-500">키워드 입력 자리</p>
+        <KeywordInput value={keyword} onChange={setKeyword} onSubmit={() => {}} />
       </Section>
 
       <Section title="추천 자료">
