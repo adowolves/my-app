@@ -48,6 +48,11 @@ function ResultCard({ item, rank }: { item: CounselItem; rank: number }) {
       </h3>
       <p className="leading-relaxed">{item.summary}</p>
       {item.words && <WordChips words={item.words} />}
+      {item.handOff && (
+        <p className="text-sm">
+          <span className="font-medium text-emerald-700 dark:text-emerald-300">넘길 곳</span> {item.handOff}
+        </p>
+      )}
       {item.rule && (
         <p className="text-sm">
           <span className="font-medium text-zinc-600 dark:text-zinc-400">관련 규정</span> {item.rule}
