@@ -1,16 +1,27 @@
 "use client";
 // 화면 전체의 상태(버튼 선택·키워드·추천 결과)를 들고 각 영역을 그린다. 설계 근거: DESIGN.md §3 화면 구성
+// 추천 계산은 브라우저 안에서 바로 한다(서버로 보내지 않음). 설계 근거: DESIGN.md §4.2
 import { useState } from "react";
+import { recommend } from "@/lib/recommend";
 import type { ButtonKey, CounselData, Selection } from "@/lib/types";
+import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
 import KeywordInput from "./KeywordInput";
+import ResultCards, { type Outcome } from "./ResultCards";
 
 export default function ConsultPanel({ data }: { data: CounselData }) {
   const [buttons, setButtons] = useState<Selection["buttons"]>({});
   const [keyword, setKeyword] = useState("");
+  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   function chooseButton(key: ButtonKey, choice: string | undefined) {
     setButtons(prev => ({ ...prev, [key]: choice }));
+  }
+
+  function runRecommend() {
+    const selection: Selection = { buttons, keyword, mode: "fast" };
+    const error = validateSelection(selection);
+    setOutcome(error ? { kind: "error", error } : { kind: "done", items: recommend(data.items, selection) });
   }
 
   return (
@@ -24,11 +35,11 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       </Section>
 
       <Section title="키워드">
-        <KeywordInput value={keyword} onChange={setKeyword} onSubmit={() => {}} />
+        <KeywordInput value={keyword} onChange={setKeyword} onSubmit={runRecommend} />
       </Section>
 
       <Section title="추천 자료">
-        <p className="text-sm text-zinc-500">추천 자료 {data.items.length}건 중 최대 3개 자리</p>
+        <ResultCards outcome={outcome} />
       </Section>
     </div>
   );

@@ -34,6 +34,13 @@ export default function KeywordInput({ value, onChange, onSubmit }: Props) {
         <span className="w-12 shrink-0 text-right text-sm tabular-nums text-zinc-500">
           {value.length}/{MAX_KEYWORD_LENGTH}
         </span>
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+        >
+          추천 받기
+        </button>
       </div>
       {error && (
         <p id="keyword-error" role="alert" className="text-sm font-medium text-red-600">
