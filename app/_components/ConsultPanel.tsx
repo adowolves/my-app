@@ -1,8 +1,16 @@
 "use client";
 // 화면 전체의 상태(버튼 선택·키워드·추천 결과)를 들고 각 영역을 그린다. 설계 근거: DESIGN.md §3 화면 구성
-import type { CounselData } from "@/lib/types";
+import { useState } from "react";
+import type { ButtonKey, CounselData, Selection } from "@/lib/types";
+import ButtonGroups from "./ButtonGroups";
 
 export default function ConsultPanel({ data }: { data: CounselData }) {
+  const [buttons, setButtons] = useState<Selection["buttons"]>({});
+
+  function chooseButton(key: ButtonKey, choice: string | undefined) {
+    setButtons(prev => ({ ...prev, [key]: choice }));
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-4">
@@ -10,7 +18,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       </header>
 
       <Section title="상황 고르기">
-        <p className="text-sm text-zinc-500">버튼 {Object.keys(data.buttons).length}줄 자리</p>
+        <ButtonGroups options={data.buttons} value={buttons} onChange={chooseButton} />
       </Section>
 
       <Section title="키워드">
