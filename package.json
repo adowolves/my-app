@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "data": "node scripts/convert-excel.mjs",
+    "prebuild": "npm run data",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
