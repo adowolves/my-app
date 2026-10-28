@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "@/lib/buildQuestion";
 import type { AnswerMode, CounselItem, Selection } from "@/lib/types";
+import ClaudeAnswer from "./ClaudeAnswer";
 import { useCopy } from "./useCopy";
 
 const MODES: { value: AnswerMode; label: string; hint: string }[] = [
@@ -86,6 +87,8 @@ export default function QuestionBox({ selection, results, mode, onModeChange }: 
           {question.length}/{MAX_QUESTION_LENGTH}자
         </p>
       </div>
+      {/* 답변 받을 LLM 선택(nice): 사내 LLM은 위 복사로, Claude는 아래 버튼으로. 질문문이 바뀌면 답도 처음 상태로 돌린다. */}
+      <ClaudeAnswer key={question} selection={{ ...selection, mode }} />
     </div>
   );
 }
