@@ -1,12 +1,12 @@
 "use client";
 // ④ 추천 자료: 카드 최대 3장, 0건 안내, 입력 오류 안내. PRD 5절 must 1 규칙 1·3·5
-import type { CounselItem } from "@/lib/types";
+import type { CounselItem, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
 
 export type Outcome =
   | { kind: "idle" }
   | { kind: "error"; error: InputError }
-  | { kind: "done"; items: CounselItem[] };
+  | { kind: "done"; items: CounselItem[]; selection: Selection };
 
 export default function ResultCards({ outcome }: { outcome: Outcome }) {
   if (outcome.kind === "idle") {

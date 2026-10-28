@@ -1,18 +1,20 @@
 "use client";
-// 화면 전체의 상태(버튼 선택·키워드·추천 결과)를 들고 각 영역을 그린다. 설계 근거: DESIGN.md §3 화면 구성
+// 화면 전체의 상태(버튼 선택·키워드·추천 결과·답변 길이)를 들고 각 영역을 그린다. 설계 근거: DESIGN.md §3 화면 구성
 // 추천 계산은 브라우저 안에서 바로 한다(서버로 보내지 않음). 설계 근거: DESIGN.md §4.2
 import { useState } from "react";
 import { recommend } from "@/lib/recommend";
-import type { ButtonKey, CounselData, Selection } from "@/lib/types";
+import type { AnswerMode, ButtonKey, CounselData, Selection } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
 import KeywordInput from "./KeywordInput";
+import QuestionBox from "./QuestionBox";
 import ResultCards, { type Outcome } from "./ResultCards";
 
 export default function ConsultPanel({ data }: { data: CounselData }) {
   const [buttons, setButtons] = useState<Selection["buttons"]>({});
   const [keyword, setKeyword] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const [mode, setMode] = useState<AnswerMode>("fast");
 
   function chooseButton(key: ButtonKey, choice: string | undefined) {
     setButtons(prev => ({ ...prev, [key]: choice }));
@@ -23,12 +25,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     setButtons({});
     setKeyword("");
     setOutcome({ kind: "idle" });
+    setMode("fast");
   }
 
   function runRecommend() {
-    const selection: Selection = { buttons, keyword, mode: "fast" };
+    const selection: Selection = { buttons, keyword, mode };
     const error = validateSelection(selection);
-    setOutcome(error ? { kind: "error", error } : { kind: "done", items: recommend(data.items, selection) });
+    setOutcome(error ? { kind: "error", error } : { kind: "done", items: recommend(data.items, selection), selection });
   }
 
   return (
@@ -55,6 +58,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       <Section title="추천 자료">
         <ResultCards outcome={outcome} />
       </Section>
+
+      {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}
+      {outcome.kind === "done" && (
+        <Section title="사내 LLM 질문문">
+          <QuestionBox selection={outcome.selection} results={outcome.items} mode={mode} onModeChange={setMode} />
+        </Section>
+      )}
     </div>
   );
 }
