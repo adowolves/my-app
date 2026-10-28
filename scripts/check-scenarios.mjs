@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { recommend } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
+import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 
 const { items } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
@@ -58,4 +59,24 @@ test("키워드 20자 제한과 주제 필수", () => {
   assert.equal(checkText("가".repeat(21), 20), "too-long");
   assert.equal(validateSelection({ buttons: {}, keyword: "취소", mode: "fast" }), "no-topic");
   assert.equal(validateSelection({ buttons: { 주제: "기타" }, keyword: "010-1234-5678", mode: "fast" }), "personal-number");
+});
+
+test("질문문: 빠른 답변은 1순위 1개, 보통 답변은 최대 3개, 모두 500자 이내", () => {
+  for (const s of scenarios) {
+    const results = recommend(items, s.selection);
+    for (const mode of ["fast", "normal"]) {
+      const text = buildQuestion({ ...s.selection, mode }, results);
+      const refs = text.split("\n").filter(line => /^\d+\. /.test(line));
+      assert.ok(text.length <= MAX_QUESTION_LENGTH, `${s.id} ${mode}: ${text.length}자`);
+      assert.equal(refs.length, Math.min(results.length, mode === "fast" ? 1 : 3), `${s.id} ${mode}`);
+      if (results.length) assert.ok(refs[0].includes(`추천DB ${results[0].id}`), "1순위 자료와 출처가 들어가야 함");
+      assert.ok(text.includes("'추측'"), "자료 밖 내용은 추측 표시 지시가 들어가야 함");
+      assert.ok(text.includes(mode === "fast" ? "3문장 이내" : "10문장 이내"));
+    }
+  }
+});
+
+test("질문문: 자료가 0건이어도 만들어지고, 없다고 적힘", () => {
+  const text = buildQuestion({ buttons: { 주제: "상환유예" }, keyword: "상환유예", mode: "fast" }, []);
+  assert.ok(text.includes("참고 자료:\n없음"));
 });
