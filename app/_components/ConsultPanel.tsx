@@ -6,6 +6,7 @@ import { recommend } from "@/lib/recommend";
 import type { AnswerMode, ButtonKey, CounselData, Selection } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
+import HandoffBox from "./HandoffBox";
 import KeywordInput from "./KeywordInput";
 import QuestionBox from "./QuestionBox";
 import ResultCards, { type Outcome } from "./ResultCards";
@@ -67,6 +68,12 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       {outcome.kind === "done" && (
         <Section title="사내 LLM 질문문">
           <QuestionBox selection={outcome.selection} results={outcome.items} mode={mode} onModeChange={setMode} />
+        </Section>
+      )}
+
+      {outcome.kind === "done" && (
+        <Section title="이관 메모">
+          <HandoffBox selection={outcome.selection} results={outcome.items} />
         </Section>
       )}
     </div>

@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { recommend } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
+import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
 
 const { items } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
@@ -79,4 +80,21 @@ test("질문문: 빠른 답변은 1순위 1개, 보통 답변은 최대 3개, �
 test("질문문: 자료가 0건이어도 만들어지고, 없다고 적힘", () => {
   const text = buildQuestion({ buttons: { 주제: "상환유예" }, keyword: "상환유예", mode: "fast" }, []);
   assert.ok(text.includes("참고 자료:\n없음"));
+});
+
+test("이관 메모: 모든 시나리오에서 300자 이내, 안내한 자료 번호와 다음 담당자 메모가 들어감", () => {
+  const note = "가".repeat(MAX_NOTE_LENGTH);
+  for (const s of scenarios) {
+    const results = recommend(items, { ...s.selection, buttons: { ...s.selection.buttons, 온도: "악성" } });
+    const memo = buildHandoff(s.selection, results, note);
+    assert.ok(memo.length <= MAX_HANDOFF_LENGTH, `${s.id}: ${memo.length}자`);
+    for (const item of results) assert.ok(memo.includes(`추천DB ${item.id}`), `${s.id}: ${item.id} 빠짐`);
+    assert.ok(memo.includes(`다음 담당자에게: ${note}`));
+  }
+});
+
+test("이관 메모: 다음 담당자 칸도 숫자 6자리 이상을 막는 같은 검사를 씀", () => {
+  assert.equal(checkText("소득 증빙 확인 필요", MAX_NOTE_LENGTH), null);
+  assert.equal(checkText("010 1234 5678로 회신", MAX_NOTE_LENGTH), "personal-number");
+  assert.equal(checkText("가".repeat(MAX_NOTE_LENGTH + 1), MAX_NOTE_LENGTH), "too-long");
 });
