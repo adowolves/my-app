@@ -2,6 +2,7 @@
 // ④ 추천 자료: 카드 최대 3장, 0건 안내, 입력 오류 안내. PRD 5절 must 1 규칙 1·3·5
 import type { CounselItem, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
+import { useCopy } from "./useCopy";
 
 export type Outcome =
   | { kind: "idle" }
@@ -46,11 +47,7 @@ function ResultCard({ item, rank }: { item: CounselItem; rank: number }) {
         {rank}. {item.question}
       </h3>
       <p className="leading-relaxed">{item.summary}</p>
-      {item.words && (
-        <p className="text-sm">
-          <span className="font-medium text-blue-700 dark:text-blue-300">추천 단어</span> {item.words}
-        </p>
-      )}
+      {item.words && <WordChips words={item.words} />}
       {item.rule && (
         <p className="text-sm">
           <span className="font-medium text-zinc-600 dark:text-zinc-400">관련 규정</span> {item.rule}
@@ -71,6 +68,34 @@ function ResultCard({ item, rank }: { item: CounselItem; rank: number }) {
         )}
       </p>
     </article>
+  );
+}
+
+/** 추천 단어: 누르면 그 단어를 바로 복사한다. PRD 5절 nice */
+function WordChips({ words }: { words: string }) {
+  const { copy, statusFor } = useCopy();
+  const list = words.split(",").map(w => w.trim()).filter(Boolean);
+  const copied = list.find(w => statusFor(w) === "copied");
+  const failed = list.find(w => statusFor(w) === "failed");
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-sm">
+      <span className="font-medium text-blue-700 dark:text-blue-300">추천 단어</span>
+      {list.map(word => (
+        <button
+          key={word}
+          type="button"
+          title="누르면 복사"
+          onClick={() => copy(word)}
+          className="rounded-md bg-blue-50 px-2 py-0.5 text-blue-900 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
+        >
+          {word}
+        </button>
+      ))}
+      <span role="status" className="text-xs">
+        {copied && <span className="text-green-700 dark:text-green-400">✓ &quot;{copied}&quot; 복사됨</span>}
+        {failed && <span className="text-red-600">⚠ 복사가 안 됐어요 — 단어를 직접 선택해 복사하세요</span>}
+      </span>
+    </div>
   );
 }
 

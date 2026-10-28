@@ -1,8 +1,9 @@
 "use client";
 // ⑤ 사내 LLM 질문문: 빠른/보통 선택, 글상자, 복사 버튼. PRD 5절 must 2 규칙 1~6
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "@/lib/buildQuestion";
 import type { AnswerMode, CounselItem, Selection } from "@/lib/types";
+import { useCopy } from "./useCopy";
 
 const MODES: { value: AnswerMode; label: string; hint: string }[] = [
   { value: "fast", label: "빠른 답변", hint: "1순위 자료 1개 · 3문장 이내" },
@@ -21,17 +22,12 @@ export default function QuestionBox({ selection, results, mode, onModeChange }: 
   const question = buildQuestion({ ...selection, mode }, results);
   const hint = MODES.find(m => m.value === mode)?.hint;
   const boxRef = useRef<HTMLTextAreaElement>(null);
-  // 마지막으로 복사를 시도한 글과 결과. 질문문이 바뀌면 안내가 저절로 사라진다.
-  const [copy, setCopy] = useState<{ text: string; ok: boolean } | null>(null);
-  const copyStatus = copy?.text === question ? (copy.ok ? "copied" : "failed") : null;
+  const { copy, statusFor } = useCopy();
+  const copyStatus = statusFor(question);
 
   async function copyQuestion() {
-    try {
-      await navigator.clipboard.writeText(question);
-      setCopy({ text: question, ok: true });
-    } catch {
-      // 사내 PC 보안 정책 등으로 막히면 글상자를 선택해 직접 복사하게 한다(규칙 6).
-      setCopy({ text: question, ok: false });
+    if (!(await copy(question))) {
+      // 복사가 막히면 글상자를 선택해 직접 복사하게 한다(규칙 6).
       boxRef.current?.focus();
       boxRef.current?.select();
     }
