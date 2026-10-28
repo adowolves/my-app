@@ -18,6 +18,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     setButtons(prev => ({ ...prev, [key]: choice }));
   }
 
+  /** [처음부터]: 버튼 선택·키워드·추천 결과를 한 번에 지운다. PRD 5절 must 1 규칙 8 */
+  function resetAll() {
+    setButtons({});
+    setKeyword("");
+    setOutcome({ kind: "idle" });
+  }
+
   function runRecommend() {
     const selection: Selection = { buttons, keyword, mode: "fast" };
     const error = validateSelection(selection);
@@ -28,6 +35,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">새출발 상담카드</h1>
+        <button
+          type="button"
+          onClick={resetAll}
+          className="shrink-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          처음부터
+        </button>
       </header>
 
       <Section title="상황 고르기">
