@@ -23,7 +23,8 @@ export type CounselItem = {
   summary: string;
   original: string;
   rule: string;
-  words: string;
+  /** 추천 문장: 상담 중 그대로 말할 30자 이내 문장들 */
+  phrases: string[];
   doNotSay: string;
   handOff: string;
   source: string;

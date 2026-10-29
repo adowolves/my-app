@@ -30,8 +30,10 @@ function readSheet(name, requiredColumns) {
   return rows;
 }
 
-// 비어 있으면 빈 카드가 나오는 칸. 관련 규정·추천 단어·하면 안 되는 말·넘길 곳은 비워도 된다("-"도 빈칸).
+// 비어 있으면 빈 카드가 나오는 칸. 관련 규정·추천 문장·하면 안 되는 말·넘길 곳은 비워도 된다("-"도 빈칸).
 const REQUIRED_CELLS = ["키워드", "추천 FAQ", "답변 요약", "FAQ 원문", "출처"];
+// 추천 문장: 칸 안에서 줄바꿈으로 나눈 문장. 통화 중 그대로 말할 수 있게 한 문장은 30자 이내로 쓴다.
+const MAX_PHRASE_LENGTH = 30;
 const ITEM_COLUMNS = ["번호", "공개등급", ...FILTER_KEYS, ...REQUIRED_CELLS];
 
 // 버튼선택지 시트: "주제 | 지원 자격 / 대상 채무 / …"
@@ -69,6 +71,14 @@ for (const row of readSheet("추천DB", ITEM_COLUMNS)) {
     filters[key] = value;
   }
   const dash = v => (v === "-" ? "" : v);
+  const phrases = dash(row["추천 문장"] ?? "")
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const tooLong = phrases.filter(s => [...s].length > MAX_PHRASE_LENGTH);
+  if (tooLong.length) {
+    throw new Error(`${where}: 추천 문장은 한 줄에 ${MAX_PHRASE_LENGTH}자 이내로 써 주세요 → ${tooLong.map(s => `"${s}"(${[...s].length}자)`).join(", ")}`);
+  }
   items.push({
     id: row["번호"],
     keywords: row["키워드"].split(",").map(s => s.trim()).filter(Boolean),
@@ -77,7 +87,7 @@ for (const row of readSheet("추천DB", ITEM_COLUMNS)) {
     summary: row["답변 요약"],
     original: row["FAQ 원문"],
     rule: dash(row["관련 규정"]),
-    words: dash(row["추천 단어"]),
+    phrases,
     doNotSay: dash(row["하면 안 되는 말"]),
     handOff: dash(row["넘길 곳"]),
     source: row["출처"],

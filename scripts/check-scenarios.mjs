@@ -105,6 +105,13 @@ test("관련 규정이 가리키는 요강 조문은 모두 요강조문 시트�
   assert.ok(def.includes("“대상채권”"));
 });
 
+test("추천 문장은 줄마다 1~3개, 한 문장 30자 이내", () => {
+  for (const item of items) {
+    assert.ok(item.phrases.length >= 1 && item.phrases.length <= 3, `${item.id}: ${item.phrases.length}개`);
+    for (const p of item.phrases) assert.ok([...p].length <= 30, `${item.id}: "${p}" ${[...p].length}자`);
+  }
+});
+
 test("번호 순 정렬은 숫자 크기 기준 (\"7\"이 \"010\"보다 앞)", () => {
   const base = items[0];
   const odd = [{ ...base, id: "010" }, { ...base, id: "7" }];

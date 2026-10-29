@@ -79,7 +79,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
 
 /**
  * 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2
- * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 단어 → 넘길 곳 → 규정 → 원문)로 놓는다.
+ * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 관련 규정 → 추천 문장 → 넘길 곳 → 원문)로 놓는다.
  */
 function ResultCard({
   item,
@@ -119,7 +119,7 @@ function ResultCard({
         </p>
       </div>
       <RuleBox rule={item.rule} articles={articles} />
-      {item.words && <WordChips words={item.words} />}
+      {item.phrases.length > 0 && <PhraseList phrases={item.phrases} />}
       {item.handOff && (
         <p className="text-sm">
           <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
@@ -190,31 +190,38 @@ function RuleBox({ rule, articles }: { rule: string; articles: Record<string, Ru
   );
 }
 
-/** 추천 단어: 누르면 그 단어를 바로 복사한다. PRD 5절 nice */
-function WordChips({ words }: { words: string }) {
+/** 추천 문장: 상담 중 그대로 말할 30자 이내 문장. 누르면 그 문장을 바로 복사한다. PRD 5절 nice */
+function PhraseList({ phrases }: { phrases: string[] }) {
   const { copy, statusFor } = useCopy();
-  const list = words.split(",").map(w => w.trim()).filter(Boolean);
-  const copied = list.find(w => statusFor(w) === "copied");
-  const failed = list.find(w => statusFor(w) === "failed");
+  const failed = phrases.some(p => statusFor(p) === "failed");
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-sm">
-      <span className="font-semibold text-blue-700 dark:text-blue-300">추천 단어</span>
-      <span className="text-xs text-zinc-500">(누르면 복사)</span>
-      {list.map(word => (
-        <button
-          key={word}
-          type="button"
-          title="누르면 복사"
-          onClick={() => copy(word)}
-          className="min-h-8 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-900 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
-        >
-          {word}
-        </button>
-      ))}
-      <span role="status" className="text-xs">
-        {copied && <span className="text-green-700 dark:text-green-400">✓ &quot;{copied}&quot; 복사됨</span>}
-        {failed && <span className="text-red-600">⚠ 복사가 안 됐어요 — 단어를 직접 선택해 복사하세요</span>}
-      </span>
+    <div className="flex flex-col gap-1.5 text-sm">
+      <p className="flex items-baseline gap-2">
+        <span className="font-semibold text-blue-700 dark:text-blue-300">💬 추천 문장</span>
+        <span className="text-xs text-zinc-500">(누르면 복사)</span>
+      </p>
+      <ul className="flex flex-col gap-1">
+        {phrases.map(phrase => (
+          <li key={phrase}>
+            <button
+              type="button"
+              title="누르면 복사"
+              onClick={() => copy(phrase)}
+              className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-left text-blue-950 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
+            >
+              <span>&ldquo;{phrase}&rdquo;</span>
+              {statusFor(phrase) === "copied" && (
+                <span className="shrink-0 text-xs font-medium text-green-700 dark:text-green-400">✓ 복사됨</span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {failed && (
+        <p role="status" className="text-xs text-red-600">
+          ⚠ 복사가 안 됐어요 — 문장을 직접 선택해 복사하세요
+        </p>
+      )}
     </div>
   );
 }
