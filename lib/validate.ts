@@ -12,9 +12,12 @@ export const INPUT_ERROR_MESSAGE: Record<InputError, string> = {
   "no-topic": "주제를 골라 주세요.",
 };
 
-/** 하이픈·공백·점을 지운 뒤 숫자가 6자리 이상 이어지면 개인정보로 본다. */
+/**
+ * 숫자 사이의 기호를 지운 뒤 숫자가 6자리 이상 이어지면 개인정보로 본다.
+ * PRD의 하이픈·공백·점에 더해 "/", 긴 대시(–), 괄호 같은 다른 기호와 전각 숫자(０１０)도 같은 방식으로 막는다.
+ */
 export function hasPersonalNumber(text: string): boolean {
-  return /\d{6,}/.test(text.replace(/[-\s.]/g, ""));
+  return /\d{6,}/.test(text.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, ""));
 }
 
 /** 키워드 한 칸만 검사한다. 이관 메모의 "다음 담당자에게" 칸에도 같은 규칙을 쓴다. */

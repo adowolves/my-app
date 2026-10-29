@@ -13,23 +13,29 @@ const MODE_RULE: Record<AnswerMode, { count: number; ask: string }> = {
   normal: { count: 3, ask: "10문장 이내로, 근거와 민원인에게 확인할 질문을 포함해 답해 주세요." },
 };
 
-function sourceLine(item: CounselItem, summaryLimit: number): string {
-  const summary =
-    summaryLimit <= 0 ? "" : item.summary.length > summaryLimit ? ` — ${item.summary.slice(0, summaryLimit)}…` : ` — ${item.summary}`;
-  return `${item.question}${summary} (출처: 추천DB ${item.id}, 새출발기금 공식 FAQ)`;
+/** 글을 limit자까지 줄이고, 줄였으면 "…"을 붙인다. */
+function cut(text: string, limit: number): string {
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
-function compose(selection: Selection, items: CounselItem[], summaryLimit: number): string {
-  const situation = BUTTON_ORDER.filter(key => selection.buttons[key])
-    .map(key => `${key} ${selection.buttons[key]}`)
-    .join(" / ");
+function sourceLine(item: CounselItem, summaryLimit: number, titleLimit: number): string {
+  const summary = summaryLimit <= 0 ? "" : ` — ${cut(item.summary, summaryLimit)}`;
+  return `${cut(item.question, titleLimit)}${summary} (출처: 추천DB ${item.id}, 새출발기금 공식 FAQ)`;
+}
+
+/** 선택 6개를 모두 적는다. 고르지 않은 버튼은 "전체"로 적는다(규칙 2, must 1 규칙 5). */
+function situationLine(selection: Selection): string {
+  return BUTTON_ORDER.map(key => `${key} ${selection.buttons[key] || "전체"}`).join(" / ");
+}
+
+function compose(selection: Selection, items: CounselItem[], summaryLimit: number, titleLimit: number): string {
   const keyword = selection.keyword.trim();
   const references = items.length
-    ? items.map((item, i) => `${i + 1}. ${sourceLine(item, summaryLimit)}`).join("\n")
+    ? items.map((item, i) => `${i + 1}. ${sourceLine(item, summaryLimit, titleLimit)}`).join("\n")
     : "없음 (상담카드 자료에서 찾지 못함)";
   return [
     "[새출발기금 상담 질문]",
-    `상황: ${situation || "고르지 않음"}`,
+    `상황: ${situationLine(selection)}`,
     `키워드: ${keyword || "없음"}`,
     "참고 자료:",
     references,
@@ -38,14 +44,20 @@ function compose(selection: Selection, items: CounselItem[], summaryLimit: numbe
 }
 
 /**
- * 질문문을 만든다. 500자를 넘으면 답변 요약부터 줄이고, 그래도 넘으면 요약을 뺀다(규칙 1).
+ * 질문문을 만든다(규칙 1). 500자를 넘으면 답변 요약부터 줄이고, 요약을 다 빼도 넘으면 FAQ 제목을 줄인다.
+ * 맨 끝의 '추측' 표시·답변 길이 지시문과 출처 번호는 잘리지 않는다(규칙 2·3).
  * results는 recommend()가 돌려준 순서 그대로 넘긴다.
  */
 export function buildQuestion(selection: Selection, results: CounselItem[]): string {
   const items = results.slice(0, MODE_RULE[selection.mode].count);
   for (let limit = 200; limit >= 0; limit -= 20) {
-    const text = compose(selection, items, limit);
+    const text = compose(selection, items, limit, Infinity);
     if (text.length <= MAX_QUESTION_LENGTH) return text;
   }
-  return compose(selection, items, 0).slice(0, MAX_QUESTION_LENGTH);
+  // 버튼 값과 20자 키워드만 들어가므로 제목을 0자까지 줄이면 반드시 500자 안에 든다.
+  for (let limit = 60; limit >= 0; limit -= 10) {
+    const text = compose(selection, items, 0, limit);
+    if (text.length <= MAX_QUESTION_LENGTH) return text;
+  }
+  return compose(selection, items, 0, 0);
 }

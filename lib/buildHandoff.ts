@@ -8,16 +8,15 @@ export const MAX_NOTE_LENGTH = 50;
 const BUTTON_ORDER: ButtonKey[] = ["주제", "연체", "채무", "단계", "구분", "온도"];
 
 function compose(selection: Selection, items: CounselItem[], note: string, titleLimit: number): string {
-  const situation = BUTTON_ORDER.filter(key => selection.buttons[key])
-    .map(key => `${key} ${selection.buttons[key]}`)
-    .join(" / ");
+  // 선택 6개를 모두 적는다. 고르지 않은 버튼은 "전체"로 적는다(규칙 1).
+  const situation = BUTTON_ORDER.map(key => `${key} ${selection.buttons[key] || "전체"}`).join(" / ");
   const title = (q: string) => (titleLimit <= 0 ? "" : q.length > titleLimit ? ` ${q.slice(0, titleLimit)}…` : ` ${q}`);
   const guided = items.length
     ? items.map(item => `추천DB ${item.id}${title(item.question)}`).join(" / ") + " (출처: 새출발기금 공식 FAQ)"
     : "없음";
   return [
     "[새출발기금 상담 이관 메모]",
-    `상황: ${situation || "고르지 않음"}`,
+    `상황: ${situation}`,
     `키워드: ${selection.keyword.trim() || "없음"}`,
     `안내한 자료: ${guided}`,
     `다음 담당자에게: ${note.trim() || "없음"}`,
