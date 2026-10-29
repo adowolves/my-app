@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 새출발 상담카드
 
-## Getting Started
+새출발기금 상담 직원이 **통화 중 버튼 6개와 키워드**만 넣으면, 공개 자료 데이터베이스에서 근거 있는 참고 자료를 **3초 안에** 추천하고, 사내 LLM에 붙여넣을 질문문을 한 번에 복사해 주는 웹 앱입니다.
 
-First, run the development server:
+- 배포 주소: https://my-app-tau-two-26.vercel.app
+- 대상 사용자: 새출발기금 상담원, 신입 상담사, 민원 응대가 많은 직원 (민원인은 쓰지 않음)
 
+## 왜 만들었나
+통화 중에는 자료를 찾거나 사내 LLM에 상황을 길게 입력할 시간이 없어, 경험이 적은 직원일수록 바로 안내하기 어렵습니다. 이 앱은 같은 공개 근거에서 출발하는 빠르고 일관된 1차 안내를 돕습니다. 자세한 배경과 목표는 [PRD.md](PRD.md)에 있습니다.
+
+## 주요 기능
+**must**
+1. **키워드 추천 목록:** 상황 버튼 6개(주제·연체·채무·단계·구분·온도)와 키워드로 최대 3개 자료를 추천합니다. 화면에 나오는 글은 모두 데이터베이스에 있는 내용이며, 새 문장을 지어내지 않습니다. 맞는 자료가 없으면 조건을 넓혀 다시 찾고, 그래도 없으면 "해당 자료 없음"을 안내합니다.
+2. **사내 LLM 질문문 복사:** 선택 내용·키워드·추천 자료와 출처를 500자 이내 질문문으로 묶어 버튼 한 번으로 복사합니다([빠른 답변] 1개·3문장 / [보통 답변] 최대 3개·10문장).
+
+**nice**
+- 추천 단어 누르면 복사, 넘길 곳(담당 창구) 표시
+- 강성·악성 민원일 때 "하면 안 되는 말" 경고와 통화 후 마음지킴 문구
+- 다음 담당자에게 넘길 이관 메모(300자) 복사 — 앱은 저장하지 않음
+- Claude로 바로 답변(서버에서만 호출, 실패·20초 초과 시 사내 LLM 복사로 안내)
+
+**상담원을 위한 화면**
+- 넓은 화면은 두 칸(왼쪽 입력, 오른쪽 결과)이라 통화 중 스크롤 없이 봅니다.
+- 카드 맨 위에 "바로 말할 내용"을 크게 보여 줍니다.
+- 화면을 열면 키워드 칸에 커서가 있고, `Enter`는 추천 받기, `Esc`는 처음부터입니다.
+
+## 데이터
+`data/counsel-db.xlsx` 한 파일이 원본이고, 빌드할 때 `data/counsel-db.json`으로 자동 변환됩니다.
+
+| 자료 | 줄 | 출처 |
+|---|---|---|
+| 공개 FAQ | 43 (001~043) | [새출발기금 홈페이지 자주하는 질문](https://www.newstartfund.or.kr/Faq/List.do) |
+| 규정 기반 자료 [규정] | 8 (044~051) | 「새출발기금 위탁채권 관리업무요강」(2026.3.25. 시행본), [캠코 정보공개 > 현행내규](https://www.kamco.or.kr/portal/bbs/view.do?bIdx=27867&ptIdx=270&mId=0601070100) |
+
+- 공개 자료만 넣습니다. 각 줄에 출처와 공개등급을 둡니다.
+- 엑셀을 고친 뒤에는 다시 배포해야 반영됩니다.
+
+## 개인정보·보안
+- 로그인·상담 이력 저장·개인정보 입력칸이 없고, 입력 내용과 결과를 어디에도 저장하지 않습니다.
+- 키워드에 숫자 6자리 이상(전화번호 등)이 들어오면 입력을 막습니다. 하이픈·공백·기호·한글 글자를 끼워 넣어도 막습니다.
+- API 키는 서버 코드에서만 읽고, 브라우저로 보내지 않습니다.
+- 보안 헤더(CSP 등)와 검색엔진 차단을 적용했습니다. Claude 답변 API에는 횟수 제한이 있습니다.
+
+## 기술 스택
+Next.js 16.4.3 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · ExcelJS(개발용, 엑셀 변환) · Anthropic SDK(nice) · Vercel 배포
+
+## 직접 실행하기
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # Claude 답변을 쓸 때만 값 채우기
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| 명령 | 하는 일 |
+|---|---|
+| `npm run dev` | 개발 서버 실행 |
+| `npm run data` | 엑셀을 JSON으로 변환 |
+| `npm run check` | 시나리오 10개와 입력·질문문 규칙 자동 채점 |
+| `npm run lint` / `npm run build` | 코드 검사 / 배포용 빌드 |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+환경변수(`.env.example` 참고): `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_FAST`, `CLAUDE_MODEL_NORMAL` — nice "Claude로 바로 답변"에서만 씁니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 문서
+| 문서 | 내용 |
+|---|---|
+| [PRD.md](PRD.md) | 기획서: 문제, 목표·성공 기준, 기능 규칙, 범위, 보안 |
+| [PLAN.md](PLAN.md) | 구현 계획과 작업 순서, 현재 단계 |
+| [DESIGN.md](DESIGN.md) | 화면 구성, 데이터 흐름, 오류 처리 |
+| [CHECK.md](CHECK.md) | 성공 기준 판정, 설계 대비 차이, 보안 점검 결과 |
+| [data/test-scenarios.md](data/test-scenarios.md) | 성공 기준 확인용 시나리오 10개와 정답 |
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 알아 둘 점
+- 새로 넣은 FAQ 031~043과 [규정] 044~051의 요약·추천 단어 등은 초안이므로, 실제 사용 전 담당자 검토가 필요합니다.
+- 규정 자료는 2026.3.25. 시행본 기준입니다. 캠코 게시본은 2026.6.29. 시행본입니다.
