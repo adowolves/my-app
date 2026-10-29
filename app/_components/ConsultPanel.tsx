@@ -3,7 +3,7 @@
 // 추천 계산은 브라우저 안에서 바로 한다(서버로 보내지 않음). 설계 근거: DESIGN.md §4.2
 import { useState } from "react";
 import { recommend } from "@/lib/recommend";
-import type { AnswerMode, ButtonKey, CounselData, Selection } from "@/lib/types";
+import { BUTTON_KEYS, type AnswerMode, type ButtonKey, type CounselData, type Selection } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
 import HandoffBox from "./HandoffBox";
@@ -39,6 +39,12 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     );
   }
 
+  // 추천을 받은 뒤 버튼이나 키워드를 바꾸면 결과가 지금 선택과 달라진다.
+  // 옛 선택으로 만든 질문문·이관 메모가 복사되지 않게 숨기고 다시 추천 받으라고 안내한다.
+  const stale =
+    outcome.kind === "done" &&
+    (outcome.selection.keyword !== keyword || BUTTON_KEYS.some(key => outcome.selection.buttons[key] !== buttons[key]));
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-4">
@@ -61,17 +67,22 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
       </Section>
 
       <Section title="추천 자료">
+        {stale && (
+          <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            선택이 바뀌었어요 — [추천 받기]를 다시 눌러 주세요. 아래 자료는 바뀌기 전 선택의 결과예요.
+          </p>
+        )}
         <ResultCards outcome={outcome} />
       </Section>
 
       {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}
-      {outcome.kind === "done" && (
+      {outcome.kind === "done" && !stale && (
         <Section title="사내 LLM 질문문">
           <QuestionBox selection={outcome.selection} results={outcome.items} mode={mode} onModeChange={setMode} />
         </Section>
       )}
 
-      {outcome.kind === "done" && (
+      {outcome.kind === "done" && !stale && (
         <Section title="이관 메모">
           <HandoffBox selection={outcome.selection} results={outcome.items} />
         </Section>

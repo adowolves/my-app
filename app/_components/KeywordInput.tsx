@@ -25,7 +25,8 @@ export default function KeywordInput({ value, onChange, onSubmit }: Props) {
           aria-invalid={error !== null}
           aria-describedby={error ? "keyword-error" : undefined}
           onChange={e => onChange(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && onSubmit()}
+          // 한글을 조합하는 중에 누른 Enter는 건너뛴다(두 번 실행되지 않게).
+          onKeyDown={e => e.key === "Enter" && !e.nativeEvent.isComposing && onSubmit()}
           className={
             "min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-2 text-base outline-none focus:ring-2 " +
             (error ? "border-red-500 focus:ring-red-300" : "border-zinc-300 focus:ring-blue-300 dark:border-zinc-700")

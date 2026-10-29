@@ -16,6 +16,10 @@ export default function ResultCards({ outcome }: { outcome: Outcome }) {
     return <p className="text-sm text-zinc-500">주제를 고르고 [추천 받기]를 누르면 공개 FAQ에서 최대 3개를 찾아 드려요.</p>;
   }
   if (outcome.kind === "error") {
+    // 키워드 경고는 ③ 입력창 아래에 이미 보이므로 여기서는 되풀이하지 않는다. 설계 근거: DESIGN.md §4.2 ①
+    if (outcome.error !== "no-topic") {
+      return <p className="text-sm text-zinc-500">키워드를 고친 뒤 [추천 받기]를 다시 눌러 주세요.</p>;
+    }
     return (
       <p role="alert" className="font-medium text-red-600">
         ⚠ {INPUT_ERROR_MESSAGE[outcome.error]}

@@ -24,12 +24,15 @@ export default function ClaudeAnswer({ selection }: { selection: Selection }) {
   async function ask() {
     setState({ kind: "loading" });
     const started = performance.now();
+    // AbortSignal.timeout이 없는 오래된 사내 브라우저에서도 동작하게 직접 타이머로 끊는다.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
     try {
       const res = await fetch("/api/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(selection),
-        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+        signal: controller.signal,
       });
       const data = (await res.json()) as AnswerResponse;
       if ("answer" in data) {
@@ -39,6 +42,8 @@ export default function ClaudeAnswer({ selection }: { selection: Selection }) {
       }
     } catch {
       setState({ kind: "failed", reason: "응답이 없거나 연결이 끊겼어요." });
+    } finally {
+      clearTimeout(timer);
     }
   }
 
