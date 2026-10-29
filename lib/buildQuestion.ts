@@ -5,6 +5,9 @@ import type { AnswerMode, ButtonKey, CounselItem, Selection } from "./types";
 
 export const MAX_QUESTION_LENGTH = 500;
 
+/** 자료마다 출처에 붙일 관리업무요강 조문. 예: { no: "제16조", title: "채무조정 신청의 취소" } */
+export type QuestionRule = { no: string; title: string };
+
 const BUTTON_ORDER: ButtonKey[] = ["주제", "연체", "채무", "단계", "구분", "온도"];
 
 /** 빠른 답변: 1순위 자료 1개·3문장 / 보통 답변: 최대 3개·10문장 (규칙 5) */
@@ -13,14 +16,26 @@ const MODE_RULE: Record<AnswerMode, { count: number; ask: string }> = {
   normal: { count: 3, ask: "10문장 이내로, 근거와 민원인에게 확인할 질문을 포함해 답해 주세요." },
 };
 
+type Shrink = { summaryLimit: number; titleLimit: number; ruleTitles: boolean };
+
 /** 글을 limit자까지 줄이고, 줄였으면 "…"을 붙인다. */
 function cut(text: string, limit: number): string {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
-function sourceLine(item: CounselItem, summaryLimit: number, titleLimit: number): string {
+/**
+ * 출처: FAQ 자료는 "새출발기금 공식 FAQ · 관련 요강 제16조(채무조정 신청의 취소)",
+ * [규정] 자료는 "관리업무요강 제2조(정의)·제19조(채무부담액의 산정)"처럼 조문 번호와 제목을 적는다.
+ */
+function sourceOf(item: CounselItem, rules: QuestionRule[], ruleTitles: boolean): string {
+  const list = rules.map(r => (ruleTitles && r.title ? `${r.no}(${r.title})` : r.no)).join("·");
+  if (item.question.startsWith("[규정]")) return `관리업무요강${list ? ` ${list}` : ""}`;
+  return `새출발기금 공식 FAQ${list ? ` · 관련 요강 ${list}` : ""}`;
+}
+
+function sourceLine(item: CounselItem, rules: QuestionRule[], { summaryLimit, titleLimit, ruleTitles }: Shrink): string {
   const summary = summaryLimit <= 0 ? "" : ` — ${cut(item.summary, summaryLimit)}`;
-  return `${cut(item.question, titleLimit)}${summary} (출처: 추천DB ${item.id}, 새출발기금 공식 FAQ)`;
+  return `${cut(item.question, titleLimit)}${summary} (출처: 추천DB ${item.id}, ${sourceOf(item, rules, ruleTitles)})`;
 }
 
 /** 선택 6개를 모두 적는다. 고르지 않은 버튼은 "전체"로 적는다(규칙 2, must 1 규칙 5). */
@@ -28,10 +43,10 @@ function situationLine(selection: Selection): string {
   return BUTTON_ORDER.map(key => `${key} ${selection.buttons[key] || "전체"}`).join(" / ");
 }
 
-function compose(selection: Selection, items: CounselItem[], summaryLimit: number, titleLimit: number): string {
+function compose(selection: Selection, items: CounselItem[], rules: QuestionRule[][], shrink: Shrink): string {
   const keyword = selection.keyword.trim();
   const references = items.length
-    ? items.map((item, i) => `${i + 1}. ${sourceLine(item, summaryLimit, titleLimit)}`).join("\n")
+    ? items.map((item, i) => `${i + 1}. ${sourceLine(item, rules[i] ?? [], shrink)}`).join("\n")
     : "없음 (상담카드 자료에서 찾지 못함)";
   return [
     "[새출발기금 상담 질문]",
@@ -44,20 +59,22 @@ function compose(selection: Selection, items: CounselItem[], summaryLimit: numbe
 }
 
 /**
- * 질문문을 만든다(규칙 1). 500자를 넘으면 답변 요약부터 줄이고, 요약을 다 빼도 넘으면 FAQ 제목을 줄인다.
- * 맨 끝의 '추측' 표시·답변 길이 지시문과 출처 번호는 잘리지 않는다(규칙 2·3).
- * results는 recommend()가 돌려준 순서 그대로 넘긴다.
+ * 질문문을 만든다(규칙 1). 500자를 넘으면 답변 요약부터 줄이고, 요약을 다 빼도 넘으면 조문 제목을 빼고 번호만 남기고,
+ * 그래도 넘으면 FAQ 제목을 줄인다. 맨 끝의 '추측' 표시·답변 길이 지시문과 출처 번호는 잘리지 않는다(규칙 2·3).
+ * results는 recommend()가 돌려준 순서 그대로 넘긴다. rules[i]는 results[i]의 관련 요강 조문이다(없으면 출처에 조문을 적지 않음).
  */
-export function buildQuestion(selection: Selection, results: CounselItem[]): string {
-  const items = results.slice(0, MODE_RULE[selection.mode].count);
-  for (let limit = 200; limit >= 0; limit -= 20) {
-    const text = compose(selection, items, limit, Infinity);
-    if (text.length <= MAX_QUESTION_LENGTH) return text;
-  }
+export function buildQuestion(selection: Selection, results: CounselItem[], rules: QuestionRule[][] = []): string {
+  const count = MODE_RULE[selection.mode].count;
+  const items = results.slice(0, count);
+  const itemRules = rules.slice(0, count);
+  const tries: Shrink[] = [];
+  for (let summaryLimit = 200; summaryLimit >= 0; summaryLimit -= 20) tries.push({ summaryLimit, titleLimit: Infinity, ruleTitles: true });
+  tries.push({ summaryLimit: 0, titleLimit: Infinity, ruleTitles: false });
   // 버튼 값과 20자 키워드만 들어가므로 제목을 0자까지 줄이면 반드시 500자 안에 든다.
-  for (let limit = 60; limit >= 0; limit -= 10) {
-    const text = compose(selection, items, 0, limit);
+  for (let titleLimit = 60; titleLimit >= 0; titleLimit -= 10) tries.push({ summaryLimit: 0, titleLimit, ruleTitles: false });
+  for (const shrink of tries) {
+    const text = compose(selection, items, itemRules, shrink);
     if (text.length <= MAX_QUESTION_LENGTH) return text;
   }
-  return compose(selection, items, 0, 0);
+  return compose(selection, items, itemRules, { summaryLimit: 0, titleLimit: 0, ruleTitles: false });
 }

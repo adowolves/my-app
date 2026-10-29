@@ -207,7 +207,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
           {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}
           {outcome.kind === "done" && !stale && (
             <Section step={4} title="사내 LLM 질문문" hint="더 자세한 검토가 필요할 때">
-              <QuestionBox selection={outcome.selection} results={outcome.items} mode={mode} onModeChange={setMode} />
+              <QuestionBox
+                selection={outcome.selection}
+                results={outcome.items}
+                mode={mode}
+                onModeChange={setMode}
+                articles={data.articles}
+              />
             </Section>
           )}
 

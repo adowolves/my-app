@@ -43,7 +43,11 @@ export function articleText(article: RuleArticle, items: number[]): string {
   return [lines[0], ...lines.slice(1).filter(line => items.some(n => line.startsWith(`${n}. `)))].join("\n");
 }
 
-/** 이관 메모에 적을 조문 번호와 제목. 요강조문 시트에 없는 조문은 번호만 남긴다. */
+/** 이관 메모·사내 LLM 질문문에 적을 조문 번호와 제목. 요강조문 시트에 없는 조문은 번호만 남긴다. */
 export function ruleLabels(rule: string, articles: Record<string, RuleArticle>): { no: string; title: string }[] {
-  return ruleRefs(rule).map(ref => ({ no: ref.no, title: articles[ref.no]?.title ?? "" }));
+  // 특정 호만 가리키면 호 번호도 적는다(예: "제2조 제33·34호").
+  return ruleRefs(rule).map(ref => ({
+    no: ref.items.length ? `${ref.no} 제${ref.items.join("·")}호` : ref.no,
+    title: articles[ref.no]?.title ?? "",
+  }));
 }

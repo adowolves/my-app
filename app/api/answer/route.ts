@@ -5,6 +5,7 @@ import { buildQuestion } from "@/lib/buildQuestion";
 import { getCounselData } from "@/lib/data";
 import { askClaude, claudeReady } from "@/lib/llm";
 import { recommend } from "@/lib/recommend";
+import { ruleLabels } from "@/lib/ruleRefs";
 import type { AnswerMode } from "@/lib/types";
 import { guardAnswer, type GuardCheck } from "./guard";
 
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
   if (isGlobalLimited()) return fail("요청이 많아 잠시 뒤에 다시 시도해야 해요.", 429);
 
   // Claude에 보내는 질문문은 사내 LLM 질문문과 같다(규칙 1).
-  const question = buildQuestion(selection, results);
+  const { articles } = getCounselData();
+  const question = buildQuestion(selection, results, results.map(item => ruleLabels(item.rule, articles)));
   const result = await askClaude({
     mode: selection.mode,
     system: SYSTEM_PROMPT,

@@ -173,6 +173,26 @@ test("Claude 답 검사 ②: 참고 자료 본문에 없는 숫자(금액·일�
   assert.equal(said.ok ? "" : said.check, "하면 안 되는 말");
 });
 
+test("질문문 출처: [규정] 자료는 요강 조문 번호·제목, FAQ 자료는 공식 FAQ와 관련 요강 조문을 적고 500자를 지킴", () => {
+  const labels = list => list.map(item => ruleLabels(item.rule, articles));
+  const rule052 = items.find(i => i.id === "052");
+  const q052 = buildQuestion({ buttons: { 주제: "감면·상환 조건" }, keyword: "재산가액", mode: "fast" }, [rule052], labels([rule052]));
+  assert.ok(q052.includes("(출처: 추천DB 052, 관리업무요강 제2조 제33·34호(정의)·제19조(채무부담액의 산정)·제20조(사회취약계층 감면))"), q052);
+  const faq015 = items.find(i => i.id === "015");
+  const q015 = buildQuestion({ buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" }, [faq015], labels([faq015]));
+  assert.ok(q015.includes("(출처: 추천DB 015, 새출발기금 공식 FAQ · 관련 요강 제16조(채무조정 신청의 취소))"), q015);
+  // 조문을 넘기지 않으면 예전처럼 출처에 조문을 적지 않음
+  assert.ok(buildQuestion({ buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" }, [faq015]).includes("(출처: 추천DB 015, 새출발기금 공식 FAQ)"));
+  for (const s of scenarios) {
+    for (const mode of ["fast", "normal"]) {
+      const results = recommend(items, { ...s.selection, mode });
+      const text = buildQuestion({ ...s.selection, mode }, results, labels(results));
+      assert.ok(text.length <= MAX_QUESTION_LENGTH, `${s.id} ${mode}: ${text.length}자`);
+      for (const item of results.slice(0, mode === "fast" ? 1 : 3)) assert.ok(text.includes(`추천DB ${item.id}`), `${s.id} ${mode}: ${item.id} 빠짐`);
+    }
+  }
+});
+
 test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {
   for (const item of items) {
     assert.ok(item.doNotSay.trim(), `${item.id}: 하면 안 되는 말 빈칸`);

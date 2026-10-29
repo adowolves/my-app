@@ -2,7 +2,8 @@
 // ⑤ 사내 LLM 질문문: 빠른/보통 선택, 글상자, 복사 버튼. PRD 5절 must 2 규칙 1~6
 import { useRef } from "react";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "@/lib/buildQuestion";
-import type { AnswerMode, CounselItem, Selection } from "@/lib/types";
+import { ruleLabels } from "@/lib/ruleRefs";
+import type { AnswerMode, CounselItem, RuleArticle, Selection } from "@/lib/types";
 import ClaudeAnswer from "./ClaudeAnswer";
 import { useCopy } from "./useCopy";
 
@@ -17,10 +18,13 @@ type Props = {
   results: CounselItem[];
   mode: AnswerMode;
   onModeChange: (mode: AnswerMode) => void;
+  /** 출처에 관련 요강 조문 번호·제목을 적기 위한 요강조문 */
+  articles: Record<string, RuleArticle>;
 };
 
-export default function QuestionBox({ selection, results, mode, onModeChange }: Props) {
-  const question = buildQuestion({ ...selection, mode }, results);
+export default function QuestionBox({ selection, results, mode, onModeChange, articles }: Props) {
+  // 자료마다 관련 요강 조문(번호·제목)을 출처에 적는다. /api/answer도 같은 방식으로 질문문을 만든다.
+  const question = buildQuestion({ ...selection, mode }, results, results.map(item => ruleLabels(item.rule, articles)));
   const hint = MODES.find(m => m.value === mode)?.hint;
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const { copy, statusFor } = useCopy();
