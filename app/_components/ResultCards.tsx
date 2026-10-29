@@ -40,7 +40,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
       </p>
     );
   }
-  // 온도가 강성·악성이면 "하면 안 되는 말"과 마음지킴 안내를 함께 보여 준다. PRD 5절 nice
+  // "하면 안 되는 말"은 늘 보여 주고, 온도가 강성·악성이면 더 눈에 띄게 하고 마음지킴 안내를 함께 보여 준다. PRD 5절 nice
   const hard = HARD_TEMPERATURES.includes(outcome.selection.buttons["온도"] ?? "");
   // 마음지킴은 압박감이 없게 차분한 색으로 결과 아래에 둔다.
   const care = hard && (
@@ -68,7 +68,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
       <ol className="flex flex-col gap-3" aria-label="추천 자료">
         {outcome.items.map((item, i) => (
           <li key={item.id}>
-            <ResultCard item={item} rank={i + 1} showDoNotSay={hard} articles={articles} />
+            <ResultCard item={item} rank={i + 1} hard={hard} articles={articles} />
           </li>
         ))}
       </ol>
@@ -79,17 +79,19 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
 
 /**
  * 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2
- * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 문장 → 근거 ① FAQ 답변 → 근거 ② 관련 규정 → 넘길 곳)로 놓는다.
+ * 신입도 맨 위 몇 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 문장 → 넘길 곳 → 근거 ① FAQ 답변 → 근거 ② 관련 규정)로 놓는다.
+ * 하면 안 되는 말·넘길 곳은 모든 줄에 채워져 있어 늘 보인다(엑셀 변환 때 빈칸이면 멈춤).
  */
 function ResultCard({
   item,
   rank,
-  showDoNotSay,
+  hard,
   articles,
 }: {
   item: CounselItem;
   rank: number;
-  showDoNotSay: boolean;
+  /** 온도가 강성·악성이면 하면 안 되는 말을 빨간 경고로 더 크게 보여 준다. */
+  hard: boolean;
   articles: Record<string, RuleArticle>;
 }) {
   const first = rank === 1;
@@ -100,11 +102,16 @@ function ResultCard({
         (first ? "border-blue-300 bg-blue-50/40 shadow-sm dark:border-blue-800 dark:bg-blue-950/30" : "border-zinc-200 dark:border-zinc-800")
       }
     >
-      {showDoNotSay && item.doNotSay && (
-        <p role="note" className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200">
-          <span className="font-bold">⚠ 하면 안 되는 말</span> &quot;{item.doNotSay}&quot;
-        </p>
-      )}
+      <p
+        role="note"
+        className={
+          hard
+            ? "rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200"
+            : "rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+        }
+      >
+        <span className="font-bold">⚠ 하면 안 되는 말</span> &quot;{item.doNotSay}&quot;
+      </p>
       <div className="flex flex-col gap-1">
         <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
           {first ? "1순위 추천" : `${rank}순위`}
@@ -118,14 +125,12 @@ function ResultCard({
         </p>
       </div>
       {item.phrases.length > 0 && <PhraseList phrases={item.phrases} />}
+      <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+        <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
+      </p>
       {/* 근거는 공식 FAQ 답변을 1순위, 관리업무요강 조문을 2순위로 함께 보여 준다. */}
       <FaqBox item={item} />
       <RuleBox rule={item.rule} articles={articles} />
-      {item.handOff && (
-        <p className="text-sm">
-          <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
-        </p>
-      )}
       <p className="text-xs text-zinc-500">자료 번호: 추천DB {item.id}</p>
     </article>
   );

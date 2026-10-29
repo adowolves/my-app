@@ -30,8 +30,8 @@ function readSheet(name, requiredColumns) {
   return rows;
 }
 
-// 비어 있으면 빈 카드가 나오는 칸. 관련 규정·추천 문장·하면 안 되는 말·넘길 곳은 비워도 된다("-"도 빈칸).
-const REQUIRED_CELLS = ["키워드", "추천 FAQ", "답변 요약", "FAQ 원문", "출처"];
+// 비어 있으면 빈 카드가 나오는 칸. 하면 안 되는 말·넘길 곳은 카드에 늘 보여 주므로 꼭 채운다(2026-10-29). 관련 규정·추천 문장은 비워도 된다("-"도 빈칸).
+const REQUIRED_CELLS = ["키워드", "추천 FAQ", "답변 요약", "FAQ 원문", "하면 안 되는 말", "넘길 곳", "출처"];
 // 추천 문장: 칸 안에서 줄바꿈으로 나눈 문장. 통화 중 그대로 말할 수 있게 한 문장은 30자 이내로 쓴다.
 const MAX_PHRASE_LENGTH = 30;
 const ITEM_COLUMNS = ["번호", "공개등급", ...FILTER_KEYS, ...REQUIRED_CELLS];
@@ -88,8 +88,8 @@ for (const row of readSheet("추천DB", ITEM_COLUMNS)) {
     original: row["FAQ 원문"],
     rule: dash(row["관련 규정"]),
     phrases,
-    doNotSay: dash(row["하면 안 되는 말"]),
-    handOff: dash(row["넘길 곳"]),
+    doNotSay: row["하면 안 되는 말"],
+    handOff: row["넘길 곳"],
     source: row["출처"],
   });
 }

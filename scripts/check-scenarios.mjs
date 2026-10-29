@@ -45,6 +45,13 @@ test("빠른 답변: 시나리오 정답이 1순위라 질문문에 정답 자�
   }
 });
 
+test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {
+  for (const item of items) {
+    assert.ok(item.doNotSay.trim(), `${item.id}: 하면 안 되는 말 빈칸`);
+    assert.ok(item.handOff.trim(), `${item.id}: 넘길 곳 빈칸`);
+  }
+});
+
 test("붙여 쓴 말: 뜻 없는 말(방식·방법 등)을 떼고, 네 글자 말은 반씩도 약하게 찾음", () => {
   const terms = searchTerms("재산가액 산정방식");
   assert.ok(terms.strong.includes("산정") && terms.strong.includes("재산가액"));
