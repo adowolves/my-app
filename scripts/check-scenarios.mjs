@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { recommend } from "../lib/recommend.ts";
+import { recommend, recommendWithScope } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
@@ -42,6 +42,28 @@ test("빠른 답변: 시나리오 정답이 1순위라 질문문에 정답 자�
     assert.equal(results[0]?.id, s.answer, `${s.id}: 1순위 ${results[0]?.id ?? "(없음)"}`);
     assert.ok(buildQuestion(s.selection, results).includes(`추천DB ${s.answer}`), `${s.id}: 질문문에 정답 없음`);
   }
+});
+
+test("키워드는 낱말로 나눠 찾고, FAQ 제목에 든 말도 찾음", () => {
+  // "서류 재제출" → "서류" 낱말로 키워드 칸(036)을 찾음
+  assert.ok(recommend(items, { buttons: { 주제: "신청·서류" }, keyword: "서류 재제출", mode: "fast" }).some(i => i.id === "036"));
+  // "외국인 신청" → 키워드 칸 "외국인"(035)이 1순위
+  assert.equal(recommend(items, { buttons: { 주제: "지원 자격" }, keyword: "외국인 신청", mode: "fast" })[0]?.id, "035");
+  // 키워드 칸에 없는 "현금서비스도" 같은 말도 키워드 칸 "현금서비스"를 품어 찾음
+  assert.equal(recommend(items, { buttons: { 주제: "대상 채무" }, keyword: "현금서비스도", mode: "fast" })[0]?.id, "041");
+});
+
+test("버튼을 모두 지키면 0건일 때: 주제만 남기고 → 전체 순으로 넓혀 찾고, 어떻게 찾았는지 알려 줌", () => {
+  const exact = recommendWithScope(items, { buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" });
+  assert.equal(exact.scope, "exact");
+  const topic = recommendWithScope(items, { buttons: { 주제: "신청·서류", 단계: "채무조정안 제시" }, keyword: "서류", mode: "fast" });
+  assert.equal(topic.scope, "topic");
+  assert.ok(topic.items.every(i => i.filters["주제"] === "신청·서류" || i.filters["주제"] === "전체"));
+  const all = recommendWithScope(items, { buttons: { 주제: "감면·상환 조건" }, keyword: "카드론", mode: "fast" });
+  assert.equal(all.scope, "all");
+  assert.equal(all.items[0]?.id, "041");
+  // 키워드 없이는 전체로 넓히지 않음(아무 자료나 나오지 않게)
+  assert.deepEqual(recommendWithScope(items, { buttons: { 주제: "상환유예" }, keyword: "", mode: "fast" }).items, []);
 });
 
 test("번호 순 정렬은 숫자 크기 기준 (\"7\"이 \"010\"보다 앞)", () => {

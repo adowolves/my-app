@@ -2,7 +2,7 @@
 // 화면 전체의 상태(버튼 선택·키워드·추천 결과·답변 길이)를 들고 각 영역을 그린다. 설계 근거: DESIGN.md §3 화면 구성
 // 추천 계산은 브라우저 안에서 바로 한다(서버로 보내지 않음). 설계 근거: DESIGN.md §4.2
 import { useState } from "react";
-import { recommend } from "@/lib/recommend";
+import { recommendWithScope } from "@/lib/recommend";
 import { BUTTON_KEYS, type AnswerMode, type ButtonKey, type CounselData, type Selection } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
@@ -35,7 +35,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     setOutcome(
       error
         ? { kind: "error", error }
-        : { kind: "done", items: recommend(data.items, selection), selection, careIndex: Math.floor(Math.random() * 3) },
+        : { kind: "done", ...recommendWithScope(data.items, selection), selection, careIndex: Math.floor(Math.random() * 3) },
     );
   }
 

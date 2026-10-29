@@ -1,6 +1,7 @@
 "use client";
 // ④ 추천 자료: 카드 최대 3장, 0건 안내, 입력 오류 안내. PRD 5절 must 1 규칙 1·3·5
 import { CARE_MESSAGES, HARD_TEMPERATURES } from "@/lib/careMessages";
+import type { SearchScope } from "@/lib/recommend";
 import type { CounselItem, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
 import { useCopy } from "./useCopy";
@@ -9,7 +10,14 @@ export type Outcome =
   | { kind: "idle" }
   | { kind: "error"; error: InputError }
   /** careIndex: 강성·악성일 때 보여 줄 마음지킴 문구 번호(추천 받을 때 하나 고름) */
-  | { kind: "done"; items: CounselItem[]; selection: Selection; careIndex: number };
+  /** scope: 고른 조건 그대로 찾았는지, 조건을 넓혀 찾았는지 */
+  | { kind: "done"; items: CounselItem[]; scope: SearchScope; selection: Selection; careIndex: number };
+
+/** 조건을 넓혀 찾았을 때 결과 위에 보여 줄 안내 */
+const SCOPE_NOTICE: Record<Exclude<SearchScope, "exact">, string> = {
+  topic: "고른 조건에 딱 맞는 자료가 없어, 주제만 맞춰 찾은 결과예요. 연체·채무·단계·구분은 다를 수 있어요.",
+  all: "고른 주제에 맞는 자료가 없어, 전체 자료에서 키워드로만 찾은 결과예요. 다른 주제의 자료일 수 있어요.",
+};
 
 export default function ResultCards({ outcome }: { outcome: Outcome }) {
   if (outcome.kind === "idle") {
@@ -45,6 +53,11 @@ export default function ResultCards({ outcome }: { outcome: Outcome }) {
   }
   return (
     <div className="flex flex-col gap-3">
+      {outcome.scope !== "exact" && (
+        <p role="status" className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-200">
+          {SCOPE_NOTICE[outcome.scope]}
+        </p>
+      )}
       <ol className="flex flex-col gap-3" aria-label="추천 자료">
         {outcome.items.map((item, i) => (
           <li key={item.id}>
