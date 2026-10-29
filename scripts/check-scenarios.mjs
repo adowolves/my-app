@@ -75,6 +75,10 @@ test("개인정보 숫자 차단", () => {
   assert.equal(hasPersonalNumber("(02)123-4567"), true);
   assert.equal(hasPersonalNumber("０１０１２３４５６７８"), true);
   assert.equal(hasPersonalNumber("1~2주 3개월"), false);
+  // 숫자 사이에 한글 자모·영문자를 끼워 넣어도 막는다
+  assert.equal(hasPersonalNumber("010ㅡ1234ㅡ5678"), true);
+  assert.equal(hasPersonalNumber("010o1234o5678"), true);
+  assert.equal(hasPersonalNumber("2026년 10월"), false);
 });
 
 test("키워드 20자 제한과 주제 필수", () => {

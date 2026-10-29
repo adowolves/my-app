@@ -13,6 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // 직원용 도구라 검색엔진에 올리지 않는다(next.config.ts의 X-Robots-Tag와 같은 뜻).
+  robots: { index: false, follow: false },
   title: "새출발 상담카드",
   description: "새출발기금 상담 직원용 공개 FAQ 추천과 사내 LLM 질문문 복사",
 };
