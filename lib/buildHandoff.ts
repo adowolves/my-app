@@ -10,7 +10,7 @@ export type HandoffRule = { no: string; title: string };
 
 const BUTTON_ORDER: ButtonKey[] = ["주제", "연체", "채무", "단계", "구분", "온도"];
 const FAQ_SOURCE = "새출발기금 공식 FAQ";
-const RULE_SOURCE = "관리업무요강(2026.3.25. 시행본)";
+const RULE_SOURCE = "관리업무요강(2026.6.29. 시행본)";
 
 /** 자료 출처를 FAQ·요강 중 실제로 쓴 것만 적는다. */
 function sourceOf(items: CounselItem[], rules: HandoffRule[][]): string {

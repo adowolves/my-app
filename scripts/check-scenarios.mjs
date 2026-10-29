@@ -82,6 +82,20 @@ test("요강 기반 자료([규정] 044~)는 FAQ 원문 칸에 조문이 그대�
   }
 });
 
+test("요강은 2026.6.29. 시행 공개본이고, 비공개 부분은 '(비공개)' 표시만 있음", () => {
+  for (const [no, article] of Object.entries(articles)) assert.ok(article.source.includes("2026.6.29. 시행본"), `${no}: 출처 시행본`);
+  for (const item of items.filter(i => i.question.startsWith("[규정]"))) assert.ok(item.source.includes("2026.6.29. 시행본"), `${item.id}: 출처 시행본`);
+  // 공개본에서 가려진 곳: 제11조②, 제50조⑤ 제4~7호, 제53조②, 제53조의2·3
+  assert.ok(articles["제11조"].text.includes("② (비공개)"));
+  assert.ok(articles["제53조"].text.includes("② (비공개)"));
+  for (const n of [4, 5, 6, 7]) assert.ok(articles["제50조"].text.includes(`${n}. (비공개)`));
+  assert.equal(articles["제53조의2"].text, "(비공개)");
+  assert.equal(articles["제53조의3"].text, "(비공개)");
+  // 예전 3.25본에 있던 제11조②(순자산 기준) 내용이 어디에도 남지 않음
+  const all = JSON.stringify({ items, articles });
+  assert.ok(!/6\.5억|순자산/.test(all), "비공개가 된 제11조② 내용이 남아 있음");
+});
+
 test("관련 규정에서 요강 조문 번호를 읽음 (요지 속 조문은 세지 않음)", () => {
   assert.deepEqual(ruleRefs("관리업무요강 제2조 제6·7호: 부실차주는 …"), [{ no: "제2조", items: [6, 7] }]);
   assert.deepEqual(ruleRefs("관리업무요강 제23조, 제25조, 제30조"), [
