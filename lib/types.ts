@@ -25,9 +25,17 @@ export type CounselItem = {
   rule: string;
   /** 추천 문장: 상담 중 그대로 말할 30자 이내 문장들 */
   phrases: string[];
+  /** 확인 질문 3개(엑셀 "확인 질문" 칸). 비어 있으면 주제별 기본 질문을 쓴다. */
+  questions: CheckQuestion[];
   doNotSay: string;
   handOff: string;
   source: string;
+};
+
+/** 민원인에게 물어볼 확인 질문 하나와 답 선택지(2~3개) */
+export type CheckQuestion = {
+  question: string;
+  options: string[];
 };
 
 /** 관리업무요강 조문 하나 (엑셀 "요강조문" 시트 한 줄) */
@@ -44,6 +52,8 @@ export type CounselData = {
   buttons: ButtonOptions;
   /** 조문 번호("제19조", "제5조의2") → 조문 */
   articles: Record<string, RuleArticle>;
+  /** 주제 → 기본 확인 질문 3개(data/default-questions.json). 확인 질문이 빈 자료에 대신 쓴다. */
+  defaultQuestions: Record<string, CheckQuestion[]>;
 };
 
 /** 답변 길이: 빠른 답변 / 보통 답변 */

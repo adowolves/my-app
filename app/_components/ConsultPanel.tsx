@@ -114,7 +114,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
             {outcome.kind === "done" && outcome.items.length > 0 && !stale && (
               <ClaudeCard key={outcome.careIndex + JSON.stringify(outcome.selection) + outcome.items.map(i => i.id).join()} selection={outcome.selection} />
             )}
-            <ResultCards outcome={outcome} articles={data.articles} />
+            <ResultCards outcome={outcome} articles={data.articles} defaultQuestions={data.defaultQuestions} />
           </Section>
 
           {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}

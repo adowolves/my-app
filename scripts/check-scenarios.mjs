@@ -9,7 +9,7 @@ import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
 import { articleText, ruleLabels, ruleRefs } from "../lib/ruleRefs.ts";
 
-const { items, articles } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
+const { items, articles, buttons, defaultQuestions } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
 // 시나리오 표 한 줄: | 번호 | 연체 | 채무 | 단계 | 구분 | 주제 | 키워드 | 정답 | 확인하는 것 |
 const COLUMNS = ["id", "연체", "채무", "단계", "구분", "주제", "keyword", "answer"];
@@ -43,6 +43,20 @@ test("빠른 답변: 시나리오 정답이 1순위라 질문문에 정답 자�
     assert.equal(results[0]?.id, s.answer, `${s.id}: 1순위 ${results[0]?.id ?? "(없음)"}`);
     assert.ok(buildQuestion(s.selection, results).includes(`추천DB ${s.answer}`), `${s.id}: 질문문에 정답 없음`);
   }
+});
+
+test("확인 질문: 줄마다 3개(없으면 주제별 기본 3개), 선택지 2~3개, 개인정보를 묻지 않음", () => {
+  const personal = /이름|성함|전화|연락처|휴대폰|핸드폰|고객번호|주민|생년월일|계좌번호|주소/;
+  const check = (where, list) => {
+    assert.equal(list.length, 3, `${where}: 질문 수`);
+    for (const q of list) {
+      assert.ok(q.question.trim(), `${where}: 빈 질문`);
+      assert.ok(q.options.length >= 2 && q.options.length <= 3, `${where}: "${q.question}" 선택지 ${q.options.length}개`);
+      assert.ok(![q.question, ...q.options].some(t => personal.test(t)), `${where}: "${q.question}" 개인정보`);
+    }
+  };
+  for (const topic of buttons["주제"]) check(`기본 질문 ${topic}`, defaultQuestions[topic]);
+  for (const item of items) check(item.id, item.questions.length ? item.questions : defaultQuestions[item.filters["주제"]]);
 });
 
 test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {

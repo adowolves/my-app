@@ -3,9 +3,8 @@
 import { CARE_MESSAGES, HARD_TEMPERATURES } from "@/lib/careMessages";
 import type { SearchScope } from "@/lib/recommend";
 import { articleText, ruleRefs } from "@/lib/ruleRefs";
-import type { CounselItem, RuleArticle, Selection } from "@/lib/types";
+import type { CheckQuestion, CounselItem, RuleArticle, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
-import { useCopy } from "./useCopy";
 
 export type Outcome =
   | { kind: "idle" }
@@ -20,7 +19,15 @@ const SCOPE_NOTICE: Record<Exclude<SearchScope, "exact">, string> = {
   all: "고른 주제에 맞는 자료가 없어, 전체 자료에서 키워드로만 찾은 결과예요. 다른 주제의 자료일 수 있어요.",
 };
 
-export default function ResultCards({ outcome, articles }: { outcome: Outcome; articles: Record<string, RuleArticle> }) {
+export default function ResultCards({
+  outcome,
+  articles,
+  defaultQuestions,
+}: {
+  outcome: Outcome;
+  articles: Record<string, RuleArticle>;
+  defaultQuestions: Record<string, CheckQuestion[]>;
+}) {
   if (outcome.kind === "idle") {
     return (
       <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
@@ -68,7 +75,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
       <ol className="flex flex-col gap-3" aria-label="추천 자료">
         {outcome.items.map((item, i) => (
           <li key={item.id}>
-            <ResultCard item={item} rank={i + 1} hard={hard} articles={articles} />
+            <ResultCard item={item} rank={i + 1} hard={hard} articles={articles} defaultQuestions={defaultQuestions} />
           </li>
         ))}
       </ol>
@@ -79,7 +86,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
 
 /**
  * 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2
- * 신입도 맨 위 몇 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 문장 → 넘길 곳 → 근거 ① FAQ 답변 → 근거 ② 관련 규정)로 놓는다.
+ * 신입도 맨 위 몇 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 확인 질문 → 넘길 곳 → 근거 ① FAQ 답변 → 근거 ② 관련 규정)로 놓는다.
  * 하면 안 되는 말·넘길 곳은 모든 줄에 채워져 있어 늘 보인다(엑셀 변환 때 빈칸이면 멈춤).
  */
 function ResultCard({
@@ -87,12 +94,14 @@ function ResultCard({
   rank,
   hard,
   articles,
+  defaultQuestions,
 }: {
   item: CounselItem;
   rank: number;
   /** 온도가 강성·악성이면 하면 안 되는 말을 빨간 경고로 더 크게 보여 준다. */
   hard: boolean;
   articles: Record<string, RuleArticle>;
+  defaultQuestions: Record<string, CheckQuestion[]>;
 }) {
   const first = rank === 1;
   return (
@@ -124,7 +133,10 @@ function ResultCard({
           {item.summary}
         </p>
       </div>
-      {item.phrases.length > 0 && <PhraseList phrases={item.phrases} />}
+      <QuestionList
+        questions={item.questions.length ? item.questions : (defaultQuestions[item.filters["주제"]] ?? defaultQuestions["기타"] ?? [])}
+        isDefault={!item.questions.length}
+      />
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
         <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
       </p>
@@ -219,38 +231,40 @@ function RuleBox({ rule, articles }: { rule: string; articles: Record<string, Ru
   );
 }
 
-/** 추천 문장: 상담 중 그대로 말할 30자 이내 문장. 누르면 그 문장을 바로 복사한다. PRD 5절 nice */
-function PhraseList({ phrases }: { phrases: string[] }) {
-  const { copy, statusFor } = useCopy();
-  const failed = phrases.some(p => statusFor(p) === "failed");
+/**
+ * 확인 질문: 정확히 안내하려고 민원인에게 물어볼 질문 3개와 답 선택지.
+ * 선택지는 지금은 보기만 한다(눌러도 아무 일도 일어나지 않게 버튼이 아닌 글자로 그린다).
+ * 자료에 질문이 없으면 주제별 기본 질문(data/default-questions.json)을 쓴다.
+ */
+function QuestionList({ questions, isDefault }: { questions: CheckQuestion[]; isDefault: boolean }) {
   return (
     <div className="flex flex-col gap-1.5 text-sm">
-      <p className="flex items-baseline gap-2">
-        <span className="font-semibold text-blue-700 dark:text-blue-300">💬 추천 문장</span>
-        <span className="text-xs text-zinc-500">(누르면 복사)</span>
+      <p className="flex flex-wrap items-baseline gap-2">
+        <span className="font-semibold text-blue-700 dark:text-blue-300">❓ 확인 질문</span>
+        <span className="text-xs text-zinc-500">{isDefault ? "(주제별 기본 질문)" : "(민원인에게 물어보기)"}</span>
       </p>
-      <ul className="flex flex-col gap-1">
-        {phrases.map(phrase => (
-          <li key={phrase}>
-            <button
-              type="button"
-              title="누르면 복사"
-              onClick={() => copy(phrase)}
-              className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-left text-blue-950 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
-            >
-              <span>&ldquo;{phrase}&rdquo;</span>
-              {statusFor(phrase) === "copied" && (
-                <span className="shrink-0 text-xs font-medium text-green-700 dark:text-green-400">✓ 복사됨</span>
-              )}
-            </button>
+      <ol className="flex flex-col gap-1.5">
+        {questions.map((q, i) => (
+          <li
+            key={q.question}
+            className="flex flex-col gap-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between dark:border-blue-900 dark:bg-blue-950"
+          >
+            <span className="text-blue-950 dark:text-blue-100">
+              {i + 1}. {q.question}
+            </span>
+            <span className="flex shrink-0 flex-wrap gap-1" aria-label="답 선택지">
+              {q.options.map(option => (
+                <span
+                  key={option}
+                  className="rounded-full border border-blue-300 bg-white px-2 py-0.5 text-xs text-blue-800 dark:border-blue-800 dark:bg-zinc-950 dark:text-blue-200"
+                >
+                  {option}
+                </span>
+              ))}
+            </span>
           </li>
         ))}
-      </ul>
-      {failed && (
-        <p role="status" className="text-xs text-red-600">
-          ⚠ 복사가 안 됐어요 — 문장을 직접 선택해 복사하세요
-        </p>
-      )}
+      </ol>
     </div>
   );
 }

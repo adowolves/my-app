@@ -1,10 +1,11 @@
 // 엑셀 추천DB(data/counsel-db.xlsx)를 앱이 읽는 목록 파일(data/counsel-db.json)로 바꾼다.
 // 설계 근거: DESIGN.md §4.1 준비 단계. `npm run data`와 `npm run build` 직전(prebuild)에 실행된다.
 import ExcelJS from "exceljs";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const SRC = new URL("../data/counsel-db.xlsx", import.meta.url);
 const OUT = new URL("../data/counsel-db.json", import.meta.url);
+const DEFAULT_QUESTIONS = new URL("../data/default-questions.json", import.meta.url);
 const BUTTON_KEYS = ["주제", "연체", "채무", "단계", "구분", "온도"];
 const FILTER_KEYS = ["연체", "채무", "단계", "구분", "주제"];
 const ANY = "전체";
@@ -34,6 +35,35 @@ function readSheet(name, requiredColumns) {
 const REQUIRED_CELLS = ["키워드", "추천 FAQ", "답변 요약", "FAQ 원문", "하면 안 되는 말", "넘길 곳", "출처"];
 // 추천 문장: 칸 안에서 줄바꿈으로 나눈 문장. 통화 중 그대로 말할 수 있게 한 문장은 30자 이내로 쓴다.
 const MAX_PHRASE_LENGTH = 30;
+
+// 확인 질문: 칸 안에서 줄바꿈으로 나눈 3줄. 한 줄은 "질문 | 선택지 / 선택지 (/ 선택지)".
+// 개인정보를 묻는 질문·선택지는 넣지 않는다(PRD 7절). 이런 낱말이 있으면 변환을 멈춘다.
+const QUESTION_COUNT = 3;
+const PERSONAL_WORDS = /이름|성함|전화|연락처|휴대폰|핸드폰|고객번호|주민|생년월일|계좌번호|주소/;
+
+/** 질문 하나를 검사한다. 문제가 있으면 무엇이 틀렸는지 글로 돌려준다. */
+function questionProblem({ question, options }) {
+  if (!question) return "질문이 비어 있습니다";
+  if (options.length < 2 || options.length > 3) return `"${question}" 선택지는 2~3개여야 합니다(지금 ${options.length}개)`;
+  if (options.some(o => !o)) return `"${question}" 빈 선택지가 있습니다`;
+  if ([question, ...options].some(t => PERSONAL_WORDS.test(t))) return `"${question}" 개인정보를 묻는 낱말이 있습니다`;
+  return null;
+}
+
+/** "질문 | 선택지 / 선택지" 줄들을 질문 목록으로 바꾼다. 칸이 비어 있으면 []. */
+function parseQuestions(cell, where) {
+  const lines = (cell ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  if (lines.length !== QUESTION_COUNT) throw new Error(`${where}: 확인 질문은 ${QUESTION_COUNT}줄이어야 합니다(지금 ${lines.length}줄).`);
+  return lines.map(line => {
+    const [question, rest = ""] = line.split("|").map(s => s.trim());
+    const q = { question, options: rest.split("/").map(s => s.trim()) };
+    const problem = questionProblem(q);
+    if (problem) throw new Error(`${where}: 확인 질문 ${problem}. "질문 | 선택지 / 선택지" 꼴로 적어 주세요.`);
+    return q;
+  });
+}
+
 const ITEM_COLUMNS = ["번호", "공개등급", ...FILTER_KEYS, ...REQUIRED_CELLS];
 
 // 버튼선택지 시트: "주제 | 지원 자격 / 대상 채무 / …"
@@ -88,6 +118,8 @@ for (const row of readSheet("추천DB", ITEM_COLUMNS)) {
     original: row["FAQ 원문"],
     rule: dash(row["관련 규정"]),
     phrases,
+    // 비어 있으면 [] — 화면이 주제별 기본 질문으로 대신 보여 준다.
+    questions: parseQuestions(row["확인 질문"], where),
     doNotSay: row["하면 안 되는 말"],
     handOff: row["넘길 곳"],
     source: row["출처"],
@@ -106,7 +138,22 @@ for (const row of readSheet("요강조문", ["조문", "제목", "전문", "출�
   articles[row["조문"]] = { title: row["제목"], text: row["전문"], source: row["출처"] };
 }
 
-writeFileSync(OUT, JSON.stringify({ items, buttons, articles }, null, 2) + "\n");
+// 주제별 기본 질문(data/default-questions.json): 확인 질문이 빈 자료에 대신 보여 준다. 주제마다 3개.
+const defaultQuestions = {};
+const rawDefaults = JSON.parse(readFileSync(DEFAULT_QUESTIONS, "utf8"));
+for (const topic of buttons["주제"]) {
+  const list = rawDefaults[topic];
+  const where = `default-questions.json "${topic}"`;
+  if (!Array.isArray(list) || list.length !== QUESTION_COUNT) throw new Error(`${where}: 기본 질문이 ${QUESTION_COUNT}개 있어야 합니다.`);
+  defaultQuestions[topic] = list.map(q => {
+    const clean = { question: String(q.question ?? "").trim(), options: (q.options ?? []).map(o => String(o).trim()) };
+    const problem = questionProblem(clean);
+    if (problem) throw new Error(`${where}: ${problem}.`);
+    return clean;
+  });
+}
+
+writeFileSync(OUT, JSON.stringify({ items, buttons, articles, defaultQuestions }, null, 2) + "\n");
 console.log(
   `counsel-db.json: ${items.length}줄, 요강 조문 ${Object.keys(articles).length}개 변환` +
     (skipped.length ? `, 비공개라 뺀 줄 ${skipped.join(", ")}` : ""),
