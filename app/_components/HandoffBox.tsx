@@ -75,7 +75,7 @@ export default function HandoffBox({ selection, results }: Props) {
             type="button"
             onClick={copyMemo}
             disabled={noteError !== null}
-            className="rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950"
+            className="min-h-11 rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950"
           >
             이관 메모 복사
           </button>

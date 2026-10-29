@@ -21,7 +21,12 @@ const SCOPE_NOTICE: Record<Exclude<SearchScope, "exact">, string> = {
 
 export default function ResultCards({ outcome }: { outcome: Outcome }) {
   if (outcome.kind === "idle") {
-    return <p className="text-sm text-zinc-500">주제를 고르고 [추천 받기]를 누르면 공개 FAQ에서 최대 3개를 찾아 드려요.</p>;
+    return (
+      <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+        <p className="font-medium">왼쪽에서 ① 주제를 고르고 ② 키워드를 넣은 뒤 [추천 받기]를 누르세요.</p>
+        <p className="mt-1 text-sm">공개 FAQ와 업무요강에서 최대 3개를 찾아, 바로 말할 내용을 맨 위에 보여 드려요.</p>
+      </div>
+    );
   }
   if (outcome.kind === "error") {
     // 키워드 경고는 ③ 입력창 아래에 이미 보이므로 여기서는 되풀이하지 않는다. 설계 근거: DESIGN.md §4.2 ①
@@ -36,9 +41,10 @@ export default function ResultCards({ outcome }: { outcome: Outcome }) {
   }
   // 온도가 강성·악성이면 "하면 안 되는 말"과 마음지킴 안내를 함께 보여 준다. PRD 5절 nice
   const hard = HARD_TEMPERATURES.includes(outcome.selection.buttons["온도"] ?? "");
+  // 마음지킴은 압박감이 없게 차분한 색으로 결과 아래에 둔다.
   const care = hard && (
-    <aside className="rounded-lg bg-violet-50 p-3 text-sm text-violet-900 dark:bg-violet-950 dark:text-violet-200">
-      <span className="font-semibold">통화 후 마음지킴</span> {CARE_MESSAGES[outcome.careIndex % CARE_MESSAGES.length]}
+    <aside className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-200">
+      <span className="font-semibold">🌿 통화 후 마음지킴</span> {CARE_MESSAGES[outcome.careIndex % CARE_MESSAGES.length]}
     </aside>
   );
   if (outcome.items.length === 0) {
@@ -70,33 +76,50 @@ export default function ResultCards({ outcome }: { outcome: Outcome }) {
   );
 }
 
-/** 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2 */
+/**
+ * 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2
+ * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 단어 → 넘길 곳 → 규정 → 원문)로 놓는다.
+ */
 function ResultCard({ item, rank, showDoNotSay }: { item: CounselItem; rank: number; showDoNotSay: boolean }) {
   const { label, url } = splitSource(item.source);
+  const first = rank === 1;
   return (
-    <article className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-      <h3 className="font-semibold">
-        {rank}. {item.question}
-      </h3>
-      <p className="leading-relaxed">{item.summary}</p>
+    <article
+      className={
+        "flex flex-col gap-3 rounded-xl border p-4 " +
+        (first ? "border-blue-300 bg-blue-50/40 shadow-sm dark:border-blue-800 dark:bg-blue-950/30" : "border-zinc-200 dark:border-zinc-800")
+      }
+    >
       {showDoNotSay && item.doNotSay && (
-        <p className="rounded-md bg-red-50 px-2 py-1 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-          <span className="font-semibold">하면 안 되는 말</span> &quot;{item.doNotSay}&quot;
+        <p role="note" className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200">
+          <span className="font-bold">⚠ 하면 안 되는 말</span> &quot;{item.doNotSay}&quot;
         </p>
       )}
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+          {first ? "1순위 추천" : `${rank}순위`}
+        </p>
+        <h3 className="font-semibold text-zinc-700 dark:text-zinc-300">{item.question}</h3>
+      </div>
+      <div className="rounded-lg bg-white p-3 ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
+        <p className="mb-1 text-xs font-semibold text-zinc-500">바로 말할 내용</p>
+        <p className={"leading-relaxed text-zinc-900 dark:text-zinc-100 " + (first ? "text-lg font-semibold" : "font-medium")}>
+          {item.summary}
+        </p>
+      </div>
       {item.words && <WordChips words={item.words} />}
       {item.handOff && (
         <p className="text-sm">
-          <span className="font-medium text-emerald-700 dark:text-emerald-300">넘길 곳</span> {item.handOff}
+          <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
         </p>
       )}
       {item.rule && (
-        <p className="text-sm">
-          <span className="font-medium text-zinc-600 dark:text-zinc-400">관련 규정</span> {item.rule}
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <span className="font-semibold text-zinc-600 dark:text-zinc-400">§ 관련 규정</span> {item.rule}
         </p>
       )}
       <details className="text-sm text-zinc-600 dark:text-zinc-400">
-        <summary className="cursor-pointer select-none">FAQ 원문 보기</summary>
+        <summary className="cursor-pointer select-none font-medium">FAQ 원문 보기</summary>
         <p className="mt-2 whitespace-pre-line">{item.original}</p>
       </details>
       <p className="text-xs text-zinc-500">
@@ -121,14 +144,15 @@ function WordChips({ words }: { words: string }) {
   const failed = list.find(w => statusFor(w) === "failed");
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-sm">
-      <span className="font-medium text-blue-700 dark:text-blue-300">추천 단어</span>
+      <span className="font-semibold text-blue-700 dark:text-blue-300">추천 단어</span>
+      <span className="text-xs text-zinc-500">(누르면 복사)</span>
       {list.map(word => (
         <button
           key={word}
           type="button"
           title="누르면 복사"
           onClick={() => copy(word)}
-          className="rounded-md bg-blue-50 px-2 py-0.5 text-blue-900 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
+          className="min-h-8 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-900 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900"
         >
           {word}
         </button>

@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
+/* 상담 화면: 오래 봐도 눈이 덜 피로하게 바탕은 옅은 회색, 영역(카드)은 흰색으로 둔다. */
 :root {
-  --background: #ffffff;
+  --background: #f4f6f8;
   --foreground: #171717;
+}
+
+/* 통화 중 빠르게 읽도록 글자를 한 단계(16px → 17px) 키운다. Tailwind 크기는 모두 이 값을 따라 커진다. */
+html {
+  font-size: 106.25%;
 }
 
 @theme inline {
@@ -22,5 +28,6 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* 회사 PC(Windows)의 맑은 고딕을 우선 쓰고, 맥은 애플 SD 고딕으로 보여 준다. */
+  font-family: var(--font-geist-sans), "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }

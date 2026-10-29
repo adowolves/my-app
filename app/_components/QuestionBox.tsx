@@ -44,12 +44,13 @@ export default function QuestionBox({ selection, results, mode, onModeChange }: 
             aria-checked={mode === m.value}
             onClick={() => onModeChange(m.value)}
             className={
-              "rounded-full border px-3 py-1.5 text-sm transition-colors " +
+              "min-h-10 rounded-full border px-4 py-1.5 text-sm transition-colors " +
               (mode === m.value
-                ? "border-blue-600 bg-blue-600 text-white"
+                ? "border-blue-600 bg-blue-600 font-semibold text-white"
                 : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800")
             }
           >
+            {mode === m.value && <span aria-hidden>✓ </span>}
             {m.label}
           </button>
         ))}
@@ -72,9 +73,9 @@ export default function QuestionBox({ selection, results, mode, onModeChange }: 
           <button
             type="button"
             onClick={copyQuestion}
-            className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            className="min-h-12 rounded-lg bg-blue-600 px-5 text-lg font-bold text-white shadow-sm hover:bg-blue-700"
           >
-            사내 LLM 질문문 복사
+            📋 사내 LLM 질문문 복사
           </button>
           <p role="status" className="text-sm font-medium">
             {copyStatus === "copied" && <span className="text-green-700 dark:text-green-400">✓ 복사됨</span>}

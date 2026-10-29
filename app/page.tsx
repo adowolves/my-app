@@ -4,7 +4,8 @@ import ConsultPanel from "./_components/ConsultPanel";
 
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+    // 넓은 상담 모니터에서는 두 칸으로 펼치므로 폭을 넓게 둔다.
+    <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:py-6">
       <ConsultPanel data={getCounselData()} />
     </main>
   );
