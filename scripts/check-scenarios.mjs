@@ -63,7 +63,22 @@ test("버튼을 모두 지키면 0건일 때: 주제만 남기고 → 전체 순
   assert.equal(all.scope, "all");
   assert.equal(all.items[0]?.id, "041");
   // 키워드 없이는 전체로 넓히지 않음(아무 자료나 나오지 않게)
-  assert.deepEqual(recommendWithScope(items, { buttons: { 주제: "상환유예" }, keyword: "", mode: "fast" }).items, []);
+  assert.deepEqual(recommendWithScope(items, { buttons: { 주제: "없는 주제" }, keyword: "", mode: "fast" }).items, []);
+});
+
+test("어디에도 없는 키워드는 넓혀 찾아도 0건 (해당 자료 없음 안내, 규칙 3)", () => {
+  for (const keyword of ["해외송금", "비트코인"]) {
+    assert.deepEqual(recommend(items, { buttons: { 주제: "기타" }, keyword, mode: "fast" }), [], keyword);
+  }
+});
+
+test("요강 기반 자료([규정] 044~)는 FAQ 원문 칸에 조문이 그대로 있고 출처가 요강", () => {
+  const rules = items.filter(i => i.question.startsWith("[규정]"));
+  assert.ok(rules.length >= 8);
+  for (const item of rules) {
+    assert.match(item.original, /^제\d+조/, `${item.id}: 조문으로 시작해야 함`);
+    assert.ok(item.source.includes("위탁채권 관리업무요강"), `${item.id}: 출처`);
+  }
 });
 
 test("번호 순 정렬은 숫자 크기 기준 (\"7\"이 \"010\"보다 앞)", () => {
