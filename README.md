@@ -18,6 +18,7 @@
 - 모든 카드에 근거 두 가지: ① **공식 FAQ 답변** 원문과 출처, ② **관련 규정**(요강 조항 요지와 조문 전문, 시행본·캠코 공개 주소)
 - 강성·악성 민원일 때 "하면 안 되는 말" 경고와 통화 후 마음지킴 문구
 - 다음 담당자에게 넘길 이관 메모(300자) 복사 — 앱은 저장하지 않음
+- **Claude 상담카드**: 추천 자료만 근거로 ① 즉답(감정→사실→절차→대안)과 ② 확인 질문 3개를 몇 초 안에 만들어 결과 맨 위에 보여 줌(초안, 실패해도 추천 카드로 계속)
 - Claude로 바로 답변(서버에서만 호출, 실패·20초 초과 시 사내 LLM 복사로 안내)
 
 **상담원을 위한 화면**
@@ -59,7 +60,7 @@ npm run dev            # http://localhost:3000
 | `npm run check` | 시나리오 10개와 입력·질문문 규칙 자동 채점 |
 | `npm run lint` / `npm run build` | 코드 검사 / 배포용 빌드 |
 
-환경변수(`.env.example` 참고): `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_FAST`, `CLAUDE_MODEL_NORMAL` — nice "Claude로 바로 답변"에서만 씁니다.
+환경변수(`.env.example` 참고): `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`(선택), `CLAUDE_MODEL_FAST`, `CLAUDE_MODEL_NORMAL` — Claude 상담카드와 "Claude로 바로 답변"에서만 씁니다. Claude 호출은 `lib/llm.ts` 한 곳에 있습니다.
 
 ## 문서
 | 문서 | 내용 |

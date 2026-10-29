@@ -178,8 +178,12 @@ lib/
 app/_components/ (nice)
   HandoffBox.tsx            이관 메모 입력·복사
   ClaudeAnswer.tsx          [Claude로 바로 답변] 버튼과 답 표시
+  ClaudeCard.tsx            Claude 상담카드(① 즉답 4단 ② 확인 질문 3개, 2026-10-29)
   useCopy.ts                복사 공통 코드 (질문문·추천 단어·이관 메모)
-app/api/answer/route.ts     Claude 호출 서버 코드 (nice, 키는 서버에서만)
+app/api/answer/route.ts     Claude로 바로 답변 서버 코드 (nice, 키는 서버에서만)
+app/api/card/route.ts       Claude 상담카드 서버 코드 (추천 자료만 근거, JSON 형식 답 검사)
+lib/llm.ts                  Claude 호출을 모은 단 한 곳 (주소·모델·키는 환경변수)
+lib/apiGuard.ts             두 API가 함께 쓰는 요청 검사·횟수 제한
 scripts/
   convert-excel.mjs         엑셀 → JSON 변환 (ExcelJS)
   check-scenarios.mjs       시나리오 10개 자동 확인

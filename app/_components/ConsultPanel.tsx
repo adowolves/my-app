@@ -7,6 +7,7 @@ import { recommendWithScope } from "@/lib/recommend";
 import { BUTTON_KEYS, type AnswerMode, type ButtonKey, type CounselData, type Selection } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
+import ClaudeCard from "./ClaudeCard";
 import HandoffBox from "./HandoffBox";
 import KeywordInput from "./KeywordInput";
 import QuestionBox from "./QuestionBox";
@@ -108,6 +109,10 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
               <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
                 선택이 바뀌었어요 — [추천 받기]를 다시 눌러 주세요. 아래 자료는 바뀌기 전 선택의 결과예요.
               </p>
+            )}
+            {/* Claude 상담카드는 추천 자료가 있을 때만 만든다(근거 없는 답을 막기 위해). 추천마다 새로 만든다. */}
+            {outcome.kind === "done" && outcome.items.length > 0 && !stale && (
+              <ClaudeCard key={outcome.careIndex + JSON.stringify(outcome.selection) + outcome.items.map(i => i.id).join()} selection={outcome.selection} />
             )}
             <ResultCards outcome={outcome} articles={data.articles} />
           </Section>
