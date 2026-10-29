@@ -107,15 +107,23 @@ function ResultCard({ item, rank, showDoNotSay }: { item: CounselItem; rank: num
           {item.summary}
         </p>
       </div>
+      {/* 관련 규정은 근거 확인에 중요하므로 늘 보여 준다. 해당 조항이 없으면 없다고 밝힌다(지어내지 않음). */}
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm dark:border-indigo-900 dark:bg-indigo-950">
+        <p className="mb-0.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300">§ 관련 규정</p>
+        {item.rule ? (
+          <ul className="flex flex-col gap-1 text-indigo-950 dark:text-indigo-100">
+            {item.rule.split(" / ").map(part => (
+              <li key={part}>{part}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-zinc-500">관리업무요강에 직접 해당하는 조항이 없어요. FAQ 원문을 근거로 안내하세요.</p>
+        )}
+      </div>
       {item.words && <WordChips words={item.words} />}
       {item.handOff && (
         <p className="text-sm">
           <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
-        </p>
-      )}
-      {item.rule && (
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          <span className="font-semibold text-zinc-600 dark:text-zinc-400">§ 관련 규정</span> {item.rule}
         </p>
       )}
       <details className="text-sm text-zinc-600 dark:text-zinc-400">
