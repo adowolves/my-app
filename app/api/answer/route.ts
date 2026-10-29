@@ -28,6 +28,15 @@ const recentRequests = new Map<string, number[]>();
 let globalRequests: number[] = [];
 let lastCleanup = 0;
 
+/** IPv6 주소의 앞 4묶음(/64). "2001:db8::1"처럼 줄여 쓴 "::"를 8묶음으로 펼친 뒤 자른다. */
+function ipv6Prefix64(ip: string): string {
+  const [head, tail] = ip.toLowerCase().split("%")[0].split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail === undefined ? [] : tail ? tail.split(":") : [];
+  const groups = tail === undefined ? left : [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right];
+  return groups.slice(0, 4).map(group => group.replace(/^0+(?=.)/, "")).join(":");
+}
+
 /**
  * 횟수를 셀 접속 주소. Vercel이 직접 넣어 주는 x-real-ip를 먼저 쓴다.
  * IPv6는 한 사람이 주소를 아주 많이 바꿔 쓸 수 있어 앞 4묶음(/64)으로 묶어 센다.
@@ -35,25 +44,34 @@ let lastCleanup = 0;
 function clientKey(request: Request): string {
   const ip = (request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0] ?? "").trim();
   if (!ip) return "unknown";
-  return ip.includes(":") ? ip.split(":").slice(0, 4).join(":") : ip;
+  return ip.includes(":") ? ipv6Prefix64(ip) : ip;
 }
 
-function isRateLimited(request: Request): boolean {
+/** 접속 주소별 제한(1분 10번). 엉터리 요청도 세어 한 곳에서 마구 보내는 것을 막는다. */
+function isClientLimited(request: Request): boolean {
   const now = Date.now();
   // 오래된 기록 정리는 1분에 한 번만 한다(요청마다 전체를 훑지 않게).
   if (now - lastCleanup >= RATE_WINDOW_MS) {
     for (const [key, times] of recentRequests) if (now - times[times.length - 1] >= RATE_WINDOW_MS) recentRequests.delete(key);
     lastCleanup = now;
   }
-  globalRequests = globalRequests.filter(time => now - time < RATE_WINDOW_MS);
-  if (globalRequests.length >= GLOBAL_RATE_LIMIT) return true;
-
   const key = clientKey(request);
   const recent = (recentRequests.get(key) ?? []).filter(time => now - time < RATE_WINDOW_MS);
   if (recent.length >= RATE_LIMIT) return true;
   if (!recentRequests.has(key) && recentRequests.size >= MAX_TRACKED_CLIENTS) return true;
   recent.push(now);
   recentRequests.set(key, recent);
+  return false;
+}
+
+/**
+ * 서버 전체 제한(1분 100번). 입력 검사를 통과해 실제로 Claude를 부를 요청만 센다.
+ * (엉터리 요청으로 칸을 채워 다른 직원의 답변을 막지 못하게)
+ */
+function isGlobalLimited(): boolean {
+  const now = Date.now();
+  globalRequests = globalRequests.filter(time => now - time < RATE_WINDOW_MS);
+  if (globalRequests.length >= GLOBAL_RATE_LIMIT) return true;
   globalRequests.push(now);
   return false;
 }
@@ -88,7 +106,8 @@ const EFFORT: Record<AnswerMode, "low" | "medium"> = { fast: "low", normal: "med
 /** 답변 길이 상한(토큰). 3문장·10문장 답에 생각할 여유를 더한 정도로 두어, 긴 글을 뽑아 가는 데 쓰이지 않게 한다. */
 const MAX_TOKENS: Record<AnswerMode, number> = { fast: 2_000, normal: 4_000 };
 
-export type AnswerResponse = { answer: string; model: string } | { error: string };
+/** 답만 돌려준다. 실제 모델 이름은 내부 설정이라 화면에 보내지 않는다. */
+export type AnswerResponse = { answer: string } | { error: string };
 
 function fail(error: string, status: number) {
   return Response.json({ error } satisfies AnswerResponse, { status });
@@ -113,7 +132,7 @@ function parseSelection(body: unknown): Selection | null {
 
 export async function POST(request: Request) {
   if (isOtherSite(request)) return fail("이 앱 화면에서만 쓸 수 있어요.", 403);
-  if (isRateLimited(request)) return fail("요청이 많아 잠시 뒤에 다시 시도해야 해요.", 429);
+  if (isClientLimited(request)) return fail("요청이 많아 잠시 뒤에 다시 시도해야 해요.", 429);
   const selection = parseSelection(await request.json().catch(() => null));
   if (!selection || validateSelection(selection)) return fail("입력이 올바르지 않아요.", 400);
 
@@ -121,9 +140,14 @@ export async function POST(request: Request) {
   const model = selection.mode === "fast" ? process.env.CLAUDE_MODEL_FAST : process.env.CLAUDE_MODEL_NORMAL;
   if (!model || !process.env.ANTHROPIC_API_KEY) return fail("Claude 설정이 없어요.", 500);
 
-  // Claude에 보내는 질문문은 사내 LLM 질문문과 같다(규칙 1).
+  // 추천 자료가 없으면 근거 없는 답이 나오므로 Claude를 부르지 않는다(사내 LLM 질문문으로 안내).
   const { items } = getCounselData();
-  const question = buildQuestion(selection, recommend(items, selection));
+  const results = recommend(items, selection);
+  if (results.length === 0) return fail("추천 자료가 없어 Claude가 근거로 쓸 자료가 없어요.", 422);
+  if (isGlobalLimited()) return fail("요청이 많아 잠시 뒤에 다시 시도해야 해요.", 429);
+
+  // Claude에 보내는 질문문은 사내 LLM 질문문과 같다(규칙 1).
+  const question = buildQuestion(selection, results);
 
   const client = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: 0 });
   try {
@@ -142,7 +166,7 @@ export async function POST(request: Request) {
       .join("\n")
       .trim();
     if (!answer) return fail("Claude 답변이 비어 있어요.", 502);
-    return Response.json({ answer, model: response.model } satisfies AnswerResponse);
+    return Response.json({ answer } satisfies AnswerResponse);
   } catch (error) {
     // 키나 질문 내용은 기록하지 않고, 어떤 종류의 실패인지만 남긴다.
     if (error instanceof Anthropic.APIConnectionTimeoutError) return fail("20초 안에 답이 오지 않았어요.", 504);

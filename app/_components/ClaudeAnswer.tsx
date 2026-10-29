@@ -15,7 +15,7 @@ function plainText(text: string): string {
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "done"; answer: string; model: string; seconds: number }
+  | { kind: "done"; answer: string; seconds: number }
   | { kind: "failed"; reason: string };
 
 export default function ClaudeAnswer({ selection }: { selection: Selection }) {
@@ -36,7 +36,7 @@ export default function ClaudeAnswer({ selection }: { selection: Selection }) {
       });
       const data = (await res.json()) as AnswerResponse;
       if ("answer" in data) {
-        setState({ kind: "done", answer: plainText(data.answer), model: data.model, seconds: (performance.now() - started) / 1000 });
+        setState({ kind: "done", answer: plainText(data.answer), seconds: (performance.now() - started) / 1000 });
       } else {
         setState({ kind: "failed", reason: data.error });
       }
@@ -71,7 +71,7 @@ export default function ClaudeAnswer({ selection }: { selection: Selection }) {
           </p>
           <p className="whitespace-pre-line text-sm leading-relaxed">{state.answer}</p>
           <p className="text-right text-xs tabular-nums text-zinc-500">
-            {state.model} · {state.seconds.toFixed(1)}초
+            {selection.mode === "fast" ? "빠른 답변" : "보통 답변"} · {state.seconds.toFixed(1)}초
           </p>
         </div>
       )}

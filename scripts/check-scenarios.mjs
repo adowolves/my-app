@@ -79,6 +79,14 @@ test("개인정보 숫자 차단", () => {
   assert.equal(hasPersonalNumber("010ㅡ1234ㅡ5678"), true);
   assert.equal(hasPersonalNumber("010o1234o5678"), true);
   assert.equal(hasPersonalNumber("2026년 10월"), false);
+  // 숫자 사이에 한글 한 글자를 끼우거나 한자 숫자로 써도 막는다. 단위가 붙은 말은 통과한다
+  assert.equal(hasPersonalNumber("010가1234가5678"), true);
+  assert.equal(hasPersonalNumber("010공1234공5678"), true);
+  assert.equal(hasPersonalNumber("2026년10월"), false);
+  assert.equal(hasPersonalNumber("〇一〇一二三四五六七八"), true);
+  assert.equal(hasPersonalNumber("150만원"), false);
+  assert.equal(hasPersonalNumber("2주3일"), false);
+  assert.equal(hasPersonalNumber("1년2개월 3주"), false);
 });
 
 test("키워드 20자 제한과 주제 필수", () => {

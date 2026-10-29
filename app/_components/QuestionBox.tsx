@@ -87,8 +87,13 @@ export default function QuestionBox({ selection, results, mode, onModeChange }: 
           {question.length}/{MAX_QUESTION_LENGTH}자
         </p>
       </div>
-      {/* 답변 받을 LLM 선택(nice): 사내 LLM은 위 복사로, Claude는 아래 버튼으로. 질문문이 바뀌면 답도 처음 상태로 돌린다. */}
-      <ClaudeAnswer key={question} selection={{ ...selection, mode }} />
+      {/* 답변 받을 LLM 선택(nice): 사내 LLM은 위 복사로, Claude는 아래 버튼으로. 질문문이 바뀌면 답도 처음 상태로 돌린다.
+          추천 자료가 0건이면 근거 없는 답이 나오므로 Claude 버튼을 보이지 않는다(서버도 같은 이유로 거절). */}
+      {results.length > 0 ? (
+        <ClaudeAnswer key={question} selection={{ ...selection, mode }} />
+      ) : (
+        <p className="text-sm text-zinc-500">추천 자료가 없어 Claude 답변은 쓸 수 없어요. 위 질문문을 사내 LLM에 붙여넣어 쓰세요.</p>
+      )}
     </div>
   );
 }
