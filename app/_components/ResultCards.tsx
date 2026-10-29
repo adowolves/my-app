@@ -79,7 +79,7 @@ export default function ResultCards({ outcome, articles }: { outcome: Outcome; a
 
 /**
  * 카드 한 장. 글은 모두 엑셀에서 온 그대로 보여 준다(지어내기 0건). PRD 5절 must 1 규칙 1·2
- * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 관련 규정 → 추천 문장 → 넘길 곳 → 원문)로 놓는다.
+ * 신입도 맨 위 두세 줄만 읽고 1차 안내를 할 수 있게, 중요한 순서(하면 안 되는 말 → 바로 말할 내용 → 추천 문장 → 근거 ① FAQ 답변 → 근거 ② 관련 규정 → 넘길 곳)로 놓는다.
  */
 function ResultCard({
   item,
@@ -92,7 +92,6 @@ function ResultCard({
   showDoNotSay: boolean;
   articles: Record<string, RuleArticle>;
 }) {
-  const { label, url } = splitSource(item.source);
   const first = rank === 1;
   return (
     <article
@@ -118,28 +117,53 @@ function ResultCard({
           {item.summary}
         </p>
       </div>
-      <RuleBox rule={item.rule} articles={articles} />
       {item.phrases.length > 0 && <PhraseList phrases={item.phrases} />}
+      {/* 근거는 공식 FAQ 답변을 1순위, 관리업무요강 조문을 2순위로 함께 보여 준다. */}
+      <FaqBox item={item} />
+      <RuleBox rule={item.rule} articles={articles} />
       {item.handOff && (
         <p className="text-sm">
           <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
         </p>
       )}
-      <details className="text-sm text-zinc-600 dark:text-zinc-400">
-        <summary className="cursor-pointer select-none font-medium">FAQ 원문 보기</summary>
-        <p className="mt-2 whitespace-pre-line">{item.original}</p>
-      </details>
-      <p className="text-xs text-zinc-500">
-        출처: 추천DB {item.id} ·{" "}
-        {url ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-            {label}
-          </a>
-        ) : (
-          label
-        )}
-      </p>
+      <p className="text-xs text-zinc-500">자료 번호: 추천DB {item.id}</p>
     </article>
+  );
+}
+
+/**
+ * 근거 ① 공식 FAQ 답변: 홈페이지 FAQ 답변 원문과 출처를 펼쳐 보여 준다.
+ * [규정] 자료는 FAQ에 해당 답변이 없으므로 없다고 밝히고, 아래 요강 조문을 근거로 쓰게 한다(지어내지 않음).
+ */
+function FaqBox({ item }: { item: CounselItem }) {
+  const ruleOnly = item.question.startsWith("[규정]");
+  const { label, url } = splitSource(item.source);
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-emerald-950">
+      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">근거 ① 공식 FAQ 답변</p>
+      {ruleOnly ? (
+        <p className="text-zinc-500">공식 FAQ에 이 내용의 답변이 없어요. 아래 ② 관리업무요강 조문을 근거로 안내하세요.</p>
+      ) : (
+        <section className="rounded-md border border-emerald-200 bg-white dark:border-emerald-900 dark:bg-zinc-950">
+          <h4 className="border-b border-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-900 dark:text-emerald-200">
+            Q. {item.question}
+          </h4>
+          <p className="max-h-56 overflow-y-auto whitespace-pre-line px-3 py-2 leading-relaxed text-zinc-800 dark:text-zinc-200">
+            {item.original}
+          </p>
+          <p className="border-t border-emerald-100 px-3 py-1.5 text-xs text-zinc-500 dark:border-emerald-900">
+            출처:{" "}
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
+                {label}
+              </a>
+            ) : (
+              label
+            )}
+          </p>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -151,7 +175,7 @@ function RuleBox({ rule, articles }: { rule: string; articles: Record<string, Ru
   const refs = ruleRefs(rule).filter(ref => articles[ref.no]);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm dark:border-indigo-900 dark:bg-indigo-950">
-      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">§ 관련 규정</p>
+      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">근거 ② 관련 규정 (관리업무요강)</p>
       {rule ? (
         <ul className="flex flex-col gap-1 text-indigo-950 dark:text-indigo-100">
           {rule.split(" / ").map(part => (
@@ -159,7 +183,7 @@ function RuleBox({ rule, articles }: { rule: string; articles: Record<string, Ru
           ))}
         </ul>
       ) : (
-        <p className="text-zinc-500">관리업무요강에 직접 해당하는 조항이 없어요. FAQ 원문을 근거로 안내하세요.</p>
+        <p className="text-zinc-500">관리업무요강에 직접 해당하는 조항이 없어요. 위 ① FAQ 답변을 근거로 안내하세요.</p>
       )}
       {refs.map(ref => {
         const article = articles[ref.no];
