@@ -3,7 +3,7 @@
 import { CARE_MESSAGES, HARD_TEMPERATURES } from "@/lib/careMessages";
 import type { SearchScope } from "@/lib/recommend";
 import { articleText, ruleRefs } from "@/lib/ruleRefs";
-import type { CheckQuestion, CounselItem, RuleArticle, Selection } from "@/lib/types";
+import type { CheckOption, CheckQuestion, CounselItem, RuleArticle, Selection } from "@/lib/types";
 import { INPUT_ERROR_MESSAGE, type InputError } from "@/lib/validate";
 
 export type Outcome =
@@ -23,10 +23,13 @@ export default function ResultCards({
   outcome,
   articles,
   defaultQuestions,
+  onChooseOption,
 }: {
   outcome: Outcome;
   articles: Record<string, RuleArticle>;
   defaultQuestions: Record<string, CheckQuestion[]>;
+  /** 확인 질문의 답을 눌렀을 때. 없으면 답을 누를 수 없다(결과가 옛 선택일 때). */
+  onChooseOption?: (question: CheckQuestion, option: CheckOption) => void;
 }) {
   if (outcome.kind === "idle") {
     return (
@@ -75,7 +78,14 @@ export default function ResultCards({
       <ol className="flex flex-col gap-3" aria-label="추천 자료">
         {outcome.items.map((item, i) => (
           <li key={item.id}>
-            <ResultCard item={item} rank={i + 1} hard={hard} articles={articles} defaultQuestions={defaultQuestions} />
+            <ResultCard
+              item={item}
+              rank={i + 1}
+              hard={hard}
+              articles={articles}
+              defaultQuestions={defaultQuestions}
+              onChooseOption={onChooseOption}
+            />
           </li>
         ))}
       </ol>
@@ -95,6 +105,7 @@ function ResultCard({
   hard,
   articles,
   defaultQuestions,
+  onChooseOption,
 }: {
   item: CounselItem;
   rank: number;
@@ -102,6 +113,7 @@ function ResultCard({
   hard: boolean;
   articles: Record<string, RuleArticle>;
   defaultQuestions: Record<string, CheckQuestion[]>;
+  onChooseOption?: (question: CheckQuestion, option: CheckOption) => void;
 }) {
   const first = rank === 1;
   return (
@@ -136,6 +148,7 @@ function ResultCard({
       <QuestionList
         questions={item.questions.length ? item.questions : (defaultQuestions[item.filters["주제"]] ?? defaultQuestions["기타"] ?? [])}
         isDefault={!item.questions.length}
+        onChoose={onChooseOption}
       />
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
         <span className="font-semibold text-emerald-700 dark:text-emerald-300">➜ 넘길 곳</span> {item.handOff}
@@ -231,17 +244,36 @@ function RuleBox({ rule, articles }: { rule: string; articles: Record<string, Ru
   );
 }
 
+/** 답이 무엇을 바꾸는지 짧게 적는다(마우스를 올리면 보이는 안내). 예: "단계 → 신청·서류 제출, 키워드 → 상계" */
+function optionEffect(option: CheckOption): string {
+  return [
+    ...Object.entries(option.set).map(([key, value]) => `${key} → ${value}`),
+    ...(option.keyword ? [`키워드 → ${option.keyword}`] : []),
+  ].join(", ");
+}
+
 /**
  * 확인 질문: 정확히 안내하려고 민원인에게 물어볼 질문 3개와 답 선택지.
- * 선택지는 지금은 보기만 한다(눌러도 아무 일도 일어나지 않게 버튼이 아닌 글자로 그린다).
+ * 답을 누르면 그 답에 적힌 상황 값·키워드로 바로 다시 찾는다(부모의 onChoose).
+ * 바꿀 값이 없는 답은 누를 수 없게 글자로만 그린다.
  * 자료에 질문이 없으면 주제별 기본 질문(data/default-questions.json)을 쓴다.
  */
-function QuestionList({ questions, isDefault }: { questions: CheckQuestion[]; isDefault: boolean }) {
+function QuestionList({
+  questions,
+  isDefault,
+  onChoose,
+}: {
+  questions: CheckQuestion[];
+  isDefault: boolean;
+  onChoose?: (question: CheckQuestion, option: CheckOption) => void;
+}) {
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       <p className="flex flex-wrap items-baseline gap-2">
         <span className="font-semibold text-blue-700 dark:text-blue-300">❓ 확인 질문</span>
-        <span className="text-xs text-zinc-500">{isDefault ? "(주제별 기본 질문)" : "(민원인에게 물어보기)"}</span>
+        <span className="text-xs text-zinc-500">
+          {isDefault ? "(주제별 기본 질문)" : "(민원인에게 물어보기)"} · 답을 누르면 조건을 바꿔 다시 찾아요
+        </span>
       </p>
       <ol className="flex flex-col gap-1.5">
         {questions.map((q, i) => (
@@ -253,14 +285,28 @@ function QuestionList({ questions, isDefault }: { questions: CheckQuestion[]; is
               {i + 1}. {q.question}
             </span>
             <span className="flex shrink-0 flex-wrap gap-1" aria-label="답 선택지">
-              {q.options.map(option => (
-                <span
-                  key={option}
-                  className="rounded-full border border-blue-300 bg-white px-2 py-0.5 text-xs text-blue-800 dark:border-blue-800 dark:bg-zinc-950 dark:text-blue-200"
-                >
-                  {option}
-                </span>
-              ))}
+              {q.options.map(option => {
+                const effect = optionEffect(option);
+                return effect && onChoose ? (
+                  <button
+                    key={option.label}
+                    type="button"
+                    title={`누르면: ${effect}`}
+                    onClick={() => onChoose(q, option)}
+                    className="min-h-7 rounded-full border border-blue-500 bg-white px-2.5 py-0.5 text-xs font-medium text-blue-800 hover:bg-blue-600 hover:text-white dark:border-blue-600 dark:bg-zinc-950 dark:text-blue-200 dark:hover:bg-blue-700"
+                  >
+                    {option.label}
+                  </button>
+                ) : (
+                  <span
+                    key={option.label}
+                    title={effect ? undefined : "이 답은 조건을 바꾸지 않아요"}
+                    className="rounded-full border border-dashed border-zinc-300 px-2.5 py-0.5 text-xs text-zinc-500 dark:border-zinc-700"
+                  >
+                    {option.label}
+                  </span>
+                );
+              })}
             </span>
           </li>
         ))}

@@ -11,14 +11,16 @@ type Props = {
   selection: Selection;
   results: CounselItem[];
   articles: Record<string, RuleArticle>;
+  /** 확인 질문에서 고른 답("질문 → 답"). 메모의 "확인한 내용" 줄이 된다. 화면 메모리에만 있다. */
+  checks: string[];
 };
 
-export default function HandoffBox({ selection, results, articles }: Props) {
+export default function HandoffBox({ selection, results, articles, checks }: Props) {
   const [note, setNote] = useState("");
   const noteError = checkText(note, MAX_NOTE_LENGTH);
   // 자료마다 관련 요강 조문 번호·제목을 메모에 붙인다.
   const rules = results.map(item => ruleLabels(item.rule, articles));
-  const memo = buildHandoff(selection, results, noteError ? "" : note, rules);
+  const memo = buildHandoff(selection, results, noteError ? "" : note, rules, checks);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const { copy, statusFor } = useCopy();
   const copyStatus = statusFor(memo);

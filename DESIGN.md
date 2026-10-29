@@ -134,7 +134,7 @@ data/counsel-db.xlsx ──(변환 스크립트)──▶ data/counsel-db.json �
 | original | FAQ 원문 | … |
 | rule | 관련 규정 (없으면 빈칸) | "" |
 | phrases | 추천 문장 (엑셀 "추천 문장" 칸, 줄바꿈으로 구분, 한 문장 30자 이내). 2026-10-29부터 화면에는 안 씀 | ["매입형은 다음 달 15일까지 취소돼요.", …] |
-| questions | 확인 질문 3개 (엑셀 "확인 질문" 칸, 한 줄 = "질문 | 선택지 / 선택지"). 비면 defaultQuestions[주제] | [{question: "신청한 채무조정 방식은 무엇인가요?", options: ["매입형", "중개형", "모름"]}, …] |
+| questions | 확인 질문 3개 (엑셀 "확인 질문" 칸, 한 줄 = "질문 \| 선택지 [키워드=…; 단계=…] / 선택지"). 선택지마다 keyword·set(바뀔 상황 값). 비면 defaultQuestions[주제] | [{question: "지금 분할상환금 연체가 있나요?", options: [{label: "있음", keyword: "효력 상실", set: {단계: "연체·실효"}}, {label: "없음", keyword: "", set: {}}]}, …] |
 | doNotSay / handOff | 하면 안 되는 말 / 넘길 곳 (nice용) | … |
 | source | 출처 | "새출발기금 홈페이지 자주하는 질문 > 신청/취소 (주소)" |
 

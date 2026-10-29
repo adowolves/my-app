@@ -37,17 +37,48 @@ const REQUIRED_CELLS = ["키워드", "추천 FAQ", "답변 요약", "FAQ 원문"
 const MAX_PHRASE_LENGTH = 30;
 
 // 확인 질문: 칸 안에서 줄바꿈으로 나눈 3줄. 한 줄은 "질문 | 선택지 / 선택지 (/ 선택지)".
+// 선택지 뒤 "[키워드=…; 단계=…]"는 그 답을 누르면 바뀔 키워드(keyword)와 상황 값(set)이다. 대괄호가 없으면 누를 수 없다.
 // 개인정보를 묻는 질문·선택지는 넣지 않는다(PRD 7절). 이런 낱말이 있으면 변환을 멈춘다.
 const QUESTION_COUNT = 3;
 const PERSONAL_WORDS = /이름|성함|전화|연락처|휴대폰|핸드폰|고객번호|주민|생년월일|계좌번호|주소/;
+/** 선택지가 바꿀 수 있는 상황 값. 온도는 직원이 느끼는 것이라 답으로 바꾸지 않는다. */
+const SETTABLE_KEYS = ["주제", "연체", "채무", "단계", "구분"];
+/** 화면 키워드 칸과 같은 제한(lib/validate.ts MAX_KEYWORD_LENGTH) */
+const MAX_KEYWORD_LENGTH = 20;
 
-/** 질문 하나를 검사한다. 문제가 있으면 무엇이 틀렸는지 글로 돌려준다. */
-function questionProblem({ question, options }) {
-  if (!question) return "질문이 비어 있습니다";
-  if (options.length < 2 || options.length > 3) return `"${question}" 선택지는 2~3개여야 합니다(지금 ${options.length}개)`;
-  if (options.some(o => !o)) return `"${question}" 빈 선택지가 있습니다`;
-  if ([question, ...options].some(t => PERSONAL_WORDS.test(t))) return `"${question}" 개인정보를 묻는 낱말이 있습니다`;
-  return null;
+/** "있음 [키워드=상계; 단계=신청·서류 제출]"을 { label, keyword, set }으로 바꾼다. 틀리면 이유를 글로 던진다. */
+function parseOption(text) {
+  const match = text.match(/^(.*?)\s*(?:\[(.*)\])?$/);
+  const label = match[1].trim();
+  const option = { label, keyword: "", set: {} };
+  for (const part of (match[2] ?? "").split(";").map(s => s.trim()).filter(Boolean)) {
+    const [key, value = ""] = part.split("=").map(s => s.trim());
+    if (!value) throw `"${label}"의 "${part}"에 값이 없습니다`;
+    if (key === "키워드") {
+      if ([...value].length > MAX_KEYWORD_LENGTH) throw `"${label}" 키워드는 ${MAX_KEYWORD_LENGTH}자 이내여야 합니다`;
+      // 화면 키워드 칸처럼 숫자 6자리 이상(개인번호처럼 보이는 것)은 넣지 않는다.
+      if ((value.match(/\d/g) ?? []).length >= 6) throw `"${label}" 키워드에 숫자가 너무 많습니다`;
+      option.keyword = value;
+    } else if (SETTABLE_KEYS.includes(key)) {
+      if (!buttons[key].includes(value)) throw `"${label}"의 ${key} 값 "${value}"이(가) 버튼선택지에 없습니다`;
+      option.set[key] = value;
+    } else {
+      throw `"${label}"의 "${key}"는 바꿀 수 없는 항목입니다(키워드·${SETTABLE_KEYS.join("·")}만 가능)`;
+    }
+  }
+  return option;
+}
+
+/** 질문 하나({ question, options: 글 목록 })를 검사해 선택지를 풀어 돌려준다. 틀리면 이유를 글로 던진다. */
+function toQuestion({ question, options }) {
+  if (!question) throw "질문이 비어 있습니다";
+  if (options.length < 2 || options.length > 3) throw `"${question}" 선택지는 2~3개여야 합니다(지금 ${options.length}개)`;
+  const parsed = options.map(parseOption);
+  if (parsed.some(o => !o.label)) throw `"${question}" 빈 선택지가 있습니다`;
+  if ([question, ...parsed.flatMap(o => [o.label, o.keyword])].some(t => PERSONAL_WORDS.test(t))) {
+    throw `"${question}" 개인정보를 묻는 낱말이 있습니다`;
+  }
+  return { question, options: parsed };
 }
 
 /** "질문 | 선택지 / 선택지" 줄들을 질문 목록으로 바꾼다. 칸이 비어 있으면 []. */
@@ -57,10 +88,11 @@ function parseQuestions(cell, where) {
   if (lines.length !== QUESTION_COUNT) throw new Error(`${where}: 확인 질문은 ${QUESTION_COUNT}줄이어야 합니다(지금 ${lines.length}줄).`);
   return lines.map(line => {
     const [question, rest = ""] = line.split("|").map(s => s.trim());
-    const q = { question, options: rest.split("/").map(s => s.trim()) };
-    const problem = questionProblem(q);
-    if (problem) throw new Error(`${where}: 확인 질문 ${problem}. "질문 | 선택지 / 선택지" 꼴로 적어 주세요.`);
-    return q;
+    try {
+      return toQuestion({ question, options: rest.split("/").map(s => s.trim()) });
+    } catch (problem) {
+      throw new Error(`${where}: 확인 질문 ${problem}. "질문 | 선택지 [키워드=…] / 선택지" 꼴로 적어 주세요.`);
+    }
   });
 }
 
@@ -146,10 +178,11 @@ for (const topic of buttons["주제"]) {
   const where = `default-questions.json "${topic}"`;
   if (!Array.isArray(list) || list.length !== QUESTION_COUNT) throw new Error(`${where}: 기본 질문이 ${QUESTION_COUNT}개 있어야 합니다.`);
   defaultQuestions[topic] = list.map(q => {
-    const clean = { question: String(q.question ?? "").trim(), options: (q.options ?? []).map(o => String(o).trim()) };
-    const problem = questionProblem(clean);
-    if (problem) throw new Error(`${where}: ${problem}.`);
-    return clean;
+    try {
+      return toQuestion({ question: String(q.question ?? "").trim(), options: (q.options ?? []).map(o => String(o).trim()) });
+    } catch (problem) {
+      throw new Error(`${where}: ${problem}.`);
+    }
   });
 }
 

@@ -32,10 +32,22 @@ export type CounselItem = {
   source: string;
 };
 
+/**
+ * 확인 질문의 답 선택지 하나. 누르면 keyword와 set(바뀔 상황 값)을 화면 ①상황·②키워드에 반영하고 다시 찾는다.
+ * 둘 다 비어 있으면 누를 수 없다.
+ */
+export type CheckOption = {
+  label: string;
+  /** 바꿀 키워드. 비어 있으면 키워드는 그대로 둔다. */
+  keyword: string;
+  /** 바꿀 상황 값(예: { 단계: "신청·서류 제출" }) */
+  set: Partial<Record<FilterKey, string>>;
+};
+
 /** 민원인에게 물어볼 확인 질문 하나와 답 선택지(2~3개) */
 export type CheckQuestion = {
   question: string;
-  options: string[];
+  options: CheckOption[];
 };
 
 /** 관리업무요강 조문 하나 (엑셀 "요강조문" 시트 한 줄) */

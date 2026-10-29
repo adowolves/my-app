@@ -52,11 +52,50 @@ test("확인 질문: 줄마다 3개(없으면 주제별 기본 3개), 선택지 
     for (const q of list) {
       assert.ok(q.question.trim(), `${where}: 빈 질문`);
       assert.ok(q.options.length >= 2 && q.options.length <= 3, `${where}: "${q.question}" 선택지 ${q.options.length}개`);
-      assert.ok(![q.question, ...q.options].some(t => personal.test(t)), `${where}: "${q.question}" 개인정보`);
+      assert.ok(![q.question, ...q.options.flatMap(o => [o.label, o.keyword])].some(t => personal.test(t)), `${where}: "${q.question}" 개인정보`);
     }
   };
   for (const topic of buttons["주제"]) check(`기본 질문 ${topic}`, defaultQuestions[topic]);
   for (const item of items) check(item.id, item.questions.length ? item.questions : defaultQuestions[item.filters["주제"]]);
+});
+
+test("확인 질문 답: 바꿀 값은 버튼선택지에 있는 값이고, 눌러서 다시 찾으면 0건이 아님", () => {
+  const settable = ["주제", "연체", "채무", "단계", "구분"];
+  const lists = [
+    ...items.map(item => ({ where: item.id, base: { 주제: item.filters["주제"] }, keyword: item.keywords[0], list: item.questions })),
+    ...buttons["주제"].map(topic => ({ where: `기본 ${topic}`, base: { 주제: topic }, keyword: "", list: defaultQuestions[topic] })),
+  ];
+  let clickable = 0;
+  for (const { where, base, keyword, list } of lists) {
+    for (const q of list) {
+      for (const option of q.options) {
+        for (const [key, value] of Object.entries(option.set)) {
+          assert.ok(settable.includes(key) && buttons[key].includes(value), `${where}: "${option.label}" ${key}=${value}`);
+        }
+        if (!option.keyword && !Object.keys(option.set).length) continue;
+        clickable++;
+        assert.equal(checkText(option.keyword, 20), null, `${where}: "${option.label}" 키워드 검사`);
+        const selection = { buttons: { ...base, ...option.set }, keyword: option.keyword || keyword, mode: "fast" };
+        assert.ok(recommend(items, selection).length > 0, `${where}: "${q.question} → ${option.label}" 다시 찾으면 0건`);
+      }
+    }
+  }
+  assert.ok(clickable >= 100, `누를 수 있는 답 ${clickable}개`);
+});
+
+test("이관 메모: 확인한 내용 줄(질문 → 답)을 더하고, 길면 오래된 확인부터 줄여 300자를 지킴", () => {
+  const picked = ["015", "016", "009"].map(id => items.find(item => item.id === id));
+  const selection = { buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" };
+  const plain = buildHandoff(selection, picked, "", []);
+  assert.ok(!plain.includes("확인한 내용"), "확인이 없으면 줄을 넣지 않음");
+  const one = buildHandoff(selection, picked, "", [], ["신청한 채무조정 방식은 무엇인가요? → 매입형"]);
+  assert.match(one, /\n확인한 내용: 신청한 채무조정 방식은 무엇인가요\? → 매입형\n다음 담당자에게: 없음$/);
+  const many = Array.from({ length: 12 }, (_, i) => `확인 질문 ${i + 1}번은 무엇인가요? → 예`);
+  const memo = buildHandoff(selection, picked, "가".repeat(MAX_NOTE_LENGTH), [], many);
+  assert.ok(memo.length <= MAX_HANDOFF_LENGTH, `${memo.length}자`);
+  assert.ok(memo.includes("확인 질문 12번은 무엇인가요? → 예"), "가장 최근 확인은 남음");
+  assert.match(memo, /\(앞 \d+건 생략\)/);
+  assert.ok(memo.endsWith(`다음 담당자에게: ${"가".repeat(MAX_NOTE_LENGTH)}`));
 });
 
 test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {

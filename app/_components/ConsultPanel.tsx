@@ -4,7 +4,15 @@
 // 넓은 화면에서는 왼쪽(①상황·②키워드)과 오른쪽(③추천·④질문문)을 나란히 두어, 통화 중 스크롤 없이 고르고 바로 결과를 본다.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { recommendWithScope } from "@/lib/recommend";
-import { BUTTON_KEYS, type AnswerMode, type ButtonKey, type CounselData, type Selection } from "@/lib/types";
+import {
+  BUTTON_KEYS,
+  type AnswerMode,
+  type ButtonKey,
+  type CheckOption,
+  type CheckQuestion,
+  type CounselData,
+  type Selection,
+} from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
 import ButtonGroups from "./ButtonGroups";
 import ClaudeCard from "./ClaudeCard";
@@ -13,11 +21,18 @@ import KeywordInput from "./KeywordInput";
 import QuestionBox from "./QuestionBox";
 import ResultCards, { type Outcome } from "./ResultCards";
 
+/** 확인 질문 답을 누르기 직전의 화면. [← 이전 카드]로 되돌릴 때 쓴다. 화면 메모리에만 두고 저장하지 않는다. */
+type Snapshot = { buttons: Selection["buttons"]; keyword: string; outcome: Outcome; checks: string[] };
+
 export default function ConsultPanel({ data }: { data: CounselData }) {
   const [buttons, setButtons] = useState<Selection["buttons"]>({});
   const [keyword, setKeyword] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [mode, setMode] = useState<AnswerMode>("fast");
+  /** 확인 질문에서 고른 답("질문 → 답"). 이관 메모의 "확인한 내용" 줄이 된다. */
+  const [checks, setChecks] = useState<string[]>([]);
+  /** 답을 누를 때마다 쌓는 직전 화면들(되돌리기 경로) */
+  const [history, setHistory] = useState<Snapshot[]>([]);
   const keywordRef = useRef<HTMLInputElement>(null);
 
   function chooseButton(key: ButtonKey, choice: string | undefined) {
@@ -30,6 +45,8 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
     setKeyword("");
     setOutcome({ kind: "idle" });
     setMode("fast");
+    setChecks([]);
+    setHistory([]);
     // 다음 전화를 바로 받을 수 있게 키워드 칸으로 돌아간다.
     keywordRef.current?.focus();
   }
@@ -37,11 +54,46 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
   function runRecommend() {
     const selection: Selection = { buttons, keyword, mode };
     const error = validateSelection(selection);
+    // 직접 다시 찾으면 확인 질문으로 이어 온 경로는 끊는다(확인한 내용은 이관 메모에 남긴다).
+    setHistory([]);
     setOutcome(
       error
         ? { kind: "error", error }
         : { kind: "done", ...recommendWithScope(data.items, selection), selection, careIndex: Math.floor(Math.random() * 3) },
     );
+  }
+
+  /**
+   * 확인 질문의 답을 누르면: ① 답에 적힌 상황 값·키워드를 ①상황·②키워드에 반영하고 ② 같은 검색 함수로 바로 다시 찾고
+   * ③ 이관 메모의 "확인한 내용"에 "질문 → 답"을 더한다. 직전 화면은 [← 이전 카드]용으로 쌓아 둔다.
+   */
+  function chooseOption(question: CheckQuestion, option: CheckOption) {
+    if (outcome.kind !== "done") return;
+    const nextButtons = { ...buttons, ...option.set };
+    const nextKeyword = option.keyword || keyword;
+    const selection: Selection = { buttons: nextButtons, keyword: nextKeyword, mode };
+    // 답의 값은 엑셀 변환 때 검사했지만, 화면 입력 규칙(주제 필수 등)도 한 번 더 지킨다.
+    if (validateSelection(selection)) return;
+    // 방금 누른 답을 또 눌러 바뀌는 게 없으면 메모에 같은 줄을 겹쳐 쓰지 않는다.
+    const line = `${question.question} → ${option.label}`;
+    const unchanged = nextKeyword === keyword && BUTTON_KEYS.every(key => nextButtons[key] === buttons[key]);
+    if (unchanged && checks.at(-1) === line) return;
+    setHistory(prev => [...prev, { buttons, keyword, outcome, checks }]);
+    setButtons(nextButtons);
+    setKeyword(nextKeyword);
+    setChecks(prev => [...prev, line]);
+    setOutcome({ kind: "done", ...recommendWithScope(data.items, selection), selection, careIndex: outcome.careIndex });
+  }
+
+  /** [← 이전 카드]: 직전 상황·키워드·카드로 돌아가고, 이관 메모의 마지막 확인 줄도 지운다. */
+  function goBack() {
+    const last = history.at(-1);
+    if (!last) return;
+    setHistory(prev => prev.slice(0, -1));
+    setButtons(last.buttons);
+    setKeyword(last.keyword);
+    setOutcome(last.outcome);
+    setChecks(last.checks);
   }
 
   // Esc 키로 [처음부터]. 통화가 끝나면 마우스 없이 바로 새로 시작한다.
@@ -105,6 +157,20 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
         {/* 오른쪽: 결과 */}
         <div className="flex flex-col gap-5">
           <Section step={3} title="추천 자료" hint="맨 위 굵은 글부터 안내하세요">
+            {history.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="min-h-10 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                >
+                  ← 이전 카드
+                </button>
+                <span className="text-xs text-zinc-500">
+                  확인 질문으로 {history.length}번 이어 왔어요 · 직전: {checks.at(-1)}
+                </span>
+              </div>
+            )}
             {stale && (
               <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
                 선택이 바뀌었어요 — [추천 받기]를 다시 눌러 주세요. 아래 자료는 바뀌기 전 선택의 결과예요.
@@ -114,7 +180,13 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
             {outcome.kind === "done" && outcome.items.length > 0 && !stale && (
               <ClaudeCard key={outcome.careIndex + JSON.stringify(outcome.selection) + outcome.items.map(i => i.id).join()} selection={outcome.selection} />
             )}
-            <ResultCards outcome={outcome} articles={data.articles} defaultQuestions={data.defaultQuestions} />
+            <ResultCards
+              outcome={outcome}
+              articles={data.articles}
+              defaultQuestions={data.defaultQuestions}
+              // 선택이 바뀌어 결과가 옛것이면 답을 눌러도 섞이지 않게 막는다.
+              onChooseOption={stale ? undefined : chooseOption}
+            />
           </Section>
 
           {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}
@@ -126,7 +198,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
 
           {outcome.kind === "done" && !stale && (
             <Section title="이관 메모" hint="다른 직원에게 넘길 때">
-              <HandoffBox selection={outcome.selection} results={outcome.items} articles={data.articles} />
+              <HandoffBox selection={outcome.selection} results={outcome.items} articles={data.articles} checks={checks} />
             </Section>
           )}
         </div>
