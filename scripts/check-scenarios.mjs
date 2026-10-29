@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { recommend, recommendWithScope } from "../lib/recommend.ts";
+import { recommend, recommendWithScope, searchTerms } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
@@ -45,6 +45,19 @@ test("빠른 답변: 시나리오 정답이 1순위라 질문문에 정답 자�
   }
 });
 
+test("붙여 쓴 말: 뜻 없는 말(방식·방법 등)을 떼고, 네 글자 말은 반씩도 약하게 찾음", () => {
+  const terms = searchTerms("재산가액 산정방식");
+  assert.ok(terms.strong.includes("산정") && terms.strong.includes("재산가액"));
+  assert.ok(!terms.strong.includes("방식"));
+  assert.deepEqual(terms.weak.sort(), ["가액", "재산"]);
+  // 산정 방식을 물으면 산정 관련 요강 자료가 1순위, 순부채(부채-재산가액) FAQ도 함께 나옴
+  const ids = recommend(items, { buttons: {}, keyword: "재산가액 산정방식", mode: "fast" }).map(i => i.id);
+  assert.equal(ids[0], "052");
+  assert.ok(ids.includes("025"), ids.join());
+  // 입력 전체와 맞는 키워드가 있는 줄이, 낱말 하나만 맞는 키워드가 많은 줄보다 앞
+  assert.equal(recommend(items, { buttons: { 주제: "신청·서류" }, keyword: "신청 방법", mode: "fast" })[0]?.id, "007");
+});
+
 test("키워드는 낱말로 나눠 찾고, FAQ 제목에 든 말도 찾음", () => {
   // "서류 재제출" → "서류" 낱말로 키워드 칸(036)을 찾음
   assert.ok(recommend(items, { buttons: { 주제: "신청·서류" }, keyword: "서류 재제출", mode: "fast" }).some(i => i.id === "036"));
@@ -57,7 +70,7 @@ test("키워드는 낱말로 나눠 찾고, FAQ 제목에 든 말도 찾음", ()
 test("버튼을 모두 지키면 0건일 때: 주제만 남기고 → 전체 순으로 넓혀 찾고, 어떻게 찾았는지 알려 줌", () => {
   const exact = recommendWithScope(items, { buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" });
   assert.equal(exact.scope, "exact");
-  const topic = recommendWithScope(items, { buttons: { 주제: "신청·서류", 단계: "채무조정안 제시" }, keyword: "서류", mode: "fast" });
+  const topic = recommendWithScope(items, { buttons: { 주제: "신청·서류", 단계: "채무조정안 제시" }, keyword: "위임장", mode: "fast" });
   assert.equal(topic.scope, "topic");
   assert.ok(topic.items.every(i => i.filters["주제"] === "신청·서류" || i.filters["주제"] === "전체"));
   const all = recommendWithScope(items, { buttons: { 주제: "감면·상환 조건" }, keyword: "카드론", mode: "fast" });
