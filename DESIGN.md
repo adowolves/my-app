@@ -185,6 +185,8 @@ app/api/answer/route.ts     Claude로 바로 답변 서버 코드 (nice, 키는 
 app/api/card/route.ts       Claude 상담카드 서버 코드 (추천 자료만 근거, JSON 형식 답 검사)
 lib/llm.ts                  Claude 호출을 모은 단 한 곳 (주소·모델·키는 환경변수)
 lib/apiGuard.ts             두 API가 함께 쓰는 요청 검사·횟수 제한
+lib/boundary.ts             경계 규칙 찾기(조건에 맞는 규칙 최대 3개, 2026-10-29)
+data/boundary-rules.json    경계 규칙: 조건·알림·확인 질문·근거 (공개 범위만, 변환 때 비공개 근거 막음)
 scripts/
   convert-excel.mjs         엑셀 → JSON 변환 (ExcelJS)
   check-scenarios.mjs       시나리오 10개 자동 확인

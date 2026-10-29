@@ -23,11 +23,14 @@ export default function ResultCards({
   outcome,
   articles,
   defaultQuestions,
+  leadQuestions = [],
   onChooseOption,
 }: {
   outcome: Outcome;
   articles: Record<string, RuleArticle>;
   defaultQuestions: Record<string, CheckQuestion[]>;
+  /** 맞는 경계 규칙들의 확인 질문. 1순위 카드의 확인 질문 앞에 올린다. */
+  leadQuestions?: CheckQuestion[];
   /** 확인 질문의 답을 눌렀을 때. 없으면 답을 누를 수 없다(결과가 옛 선택일 때). */
   onChooseOption?: (question: CheckQuestion, option: CheckOption) => void;
 }) {
@@ -84,6 +87,8 @@ export default function ResultCards({
               hard={hard}
               articles={articles}
               defaultQuestions={defaultQuestions}
+              // 경계 질문은 1순위 카드의 확인 질문 1번으로만 올린다(카드마다 반복하지 않게).
+              leadQuestions={i === 0 ? leadQuestions : []}
               onChooseOption={onChooseOption}
             />
           </li>
@@ -105,6 +110,7 @@ function ResultCard({
   hard,
   articles,
   defaultQuestions,
+  leadQuestions,
   onChooseOption,
 }: {
   item: CounselItem;
@@ -113,6 +119,8 @@ function ResultCard({
   hard: boolean;
   articles: Record<string, RuleArticle>;
   defaultQuestions: Record<string, CheckQuestion[]>;
+  /** 경계 규칙의 확인 질문(1순위 카드에만 준다) */
+  leadQuestions: CheckQuestion[];
   onChooseOption?: (question: CheckQuestion, option: CheckOption) => void;
 }) {
   const first = rank === 1;
@@ -148,6 +156,7 @@ function ResultCard({
       <QuestionList
         questions={item.questions.length ? item.questions : (defaultQuestions[item.filters["주제"]] ?? defaultQuestions["기타"] ?? [])}
         isDefault={!item.questions.length}
+        lead={leadQuestions}
         onChoose={onChooseOption}
       />
       <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
@@ -261,12 +270,17 @@ function optionEffect(option: CheckOption): string {
 function QuestionList({
   questions,
   isDefault,
+  lead = [],
   onChoose,
 }: {
   questions: CheckQuestion[];
   isDefault: boolean;
+  /** 경계 규칙의 확인 질문. 맨 앞(1번부터)에 노란색으로 올린다. */
+  lead?: CheckQuestion[];
   onChoose?: (question: CheckQuestion, option: CheckOption) => void;
 }) {
+  // 경계 질문을 앞에 두고, 같은 질문이 자료에도 있으면 한 번만 보여 준다.
+  const all = [...lead, ...questions.filter(q => !lead.some(l => l.question === q.question))];
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       <p className="flex flex-wrap items-baseline gap-2">
@@ -276,13 +290,19 @@ function QuestionList({
         </span>
       </p>
       <ol className="flex flex-col gap-1.5">
-        {questions.map((q, i) => (
+        {all.map((q, i) => (
           <li
             key={q.question}
-            className="flex flex-col gap-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between dark:border-blue-900 dark:bg-blue-950"
+            className={
+              "flex flex-col gap-1 rounded-md border px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between " +
+              (i < lead.length
+                ? "border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950"
+                : "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950")
+            }
           >
             <span className="text-blue-950 dark:text-blue-100">
-              {i + 1}. {q.question}
+              {i + 1}. {i < lead.length && <span className="mr-1 text-xs font-semibold text-yellow-700 dark:text-yellow-300">⚑ 경계</span>}
+              {q.question}
             </span>
             <span className="flex shrink-0 flex-wrap gap-1" aria-label="답 선택지">
               {q.options.map(option => {

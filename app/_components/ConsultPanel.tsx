@@ -14,6 +14,7 @@ import {
   type Selection,
 } from "@/lib/types";
 import { validateSelection } from "@/lib/validate";
+import { matchBoundaryRules } from "@/lib/boundary";
 import ButtonGroups from "./ButtonGroups";
 import ClaudeCard from "./ClaudeCard";
 import HandoffBox from "./HandoffBox";
@@ -116,6 +117,8 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
   const stale =
     outcome.kind === "done" &&
     (outcome.selection.keyword !== keyword || BUTTON_KEYS.some(key => outcome.selection.buttons[key] !== buttons[key]));
+  // 지금 보이는 결과의 상황·키워드에 맞는 경계 규칙. 결과가 옛 선택이면 띄우지 않는다.
+  const boundary = outcome.kind === "done" && !stale ? matchBoundaryRules(data.boundaryRules, outcome.selection) : [];
   // 주제를 안 고르고 [추천 받기]를 누르면 주제 줄을 강조한다.
   const missingTopic = outcome.kind === "error" && outcome.error === "no-topic" && !buttons["주제"];
 
@@ -157,6 +160,17 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
         {/* 오른쪽: 결과 */}
         <div className="flex flex-col gap-5">
           <Section step={3} title="추천 자료" hint="맨 위 굵은 글부터 안내하세요">
+            {/* 경계 규칙: 지금 찾은 상황이 경계에 걸리면 맨 위에 노란 띠로 알린다(최대 3개). */}
+            {boundary.map(rule => (
+              <p
+                key={rule.id}
+                role="note"
+                className="rounded-lg border-l-4 border-yellow-400 bg-yellow-100 px-3 py-2 text-sm text-yellow-950 dark:border-yellow-500 dark:bg-yellow-950 dark:text-yellow-100"
+              >
+                <span className="font-bold">⚑ 경계 알림</span> {rule.alert}
+                <span className="mt-0.5 block text-xs text-yellow-800 dark:text-yellow-300">근거: {rule.basis}</span>
+              </p>
+            ))}
             {history.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -184,6 +198,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
               outcome={outcome}
               articles={data.articles}
               defaultQuestions={data.defaultQuestions}
+              leadQuestions={boundary.map(rule => rule.question)}
               // 선택이 바뀌어 결과가 옛것이면 답을 눌러도 섞이지 않게 막는다.
               onChooseOption={stale ? undefined : chooseOption}
             />

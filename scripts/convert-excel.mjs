@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const SRC = new URL("../data/counsel-db.xlsx", import.meta.url);
 const OUT = new URL("../data/counsel-db.json", import.meta.url);
 const DEFAULT_QUESTIONS = new URL("../data/default-questions.json", import.meta.url);
+const BOUNDARY_RULES = new URL("../data/boundary-rules.json", import.meta.url);
 const BUTTON_KEYS = ["주제", "연체", "채무", "단계", "구분", "온도"];
 const FILTER_KEYS = ["연체", "채무", "단계", "구분", "주제"];
 const ANY = "전체";
@@ -186,7 +187,47 @@ for (const topic of buttons["주제"]) {
   });
 }
 
-writeFileSync(OUT, JSON.stringify({ items, buttons, articles, defaultQuestions }, null, 2) + "\n");
+// 경계 규칙(data/boundary-rules.json): 조건에 맞으면 추천 자료 위에 노란 띠로 알리고 확인 질문을 1번으로 올린다.
+// 공개본에서 비공개인 근거(제11조②, 제53조②, 제53조의2·3, 별표 1~4·11 등)와 그 내용(순자산 6.5억 등)은 쓰지 않는다.
+const NON_PUBLIC = /별표\s*(?:[1-4]|11)(?!\d)|제11조\s*(?:②|제2항)|제53조\s*(?:②|제2항)|제53조의[23]|순자산|6\.5억/;
+const boundaryRules = [];
+const rawRules = JSON.parse(readFileSync(BOUNDARY_RULES, "utf8")).rules ?? [];
+for (const rule of rawRules) {
+  const where = `boundary-rules.json "${rule["번호"] ?? "?"}"`;
+  const fail = problem => {
+    throw new Error(`${where}: ${problem}.`);
+  };
+  if (!/^B\d{2}$/.test(rule["번호"] ?? "")) fail('번호는 "B01"처럼 적어 주세요');
+  if (boundaryRules.some(r => r.id === rule["번호"])) fail("번호가 겹칩니다");
+  for (const column of ["알림", "확인 질문", "근거"]) if (!String(rule[column] ?? "").trim()) fail(`"${column}" 칸이 비어 있습니다`);
+  const when = { buttons: {}, keywordAny: [] };
+  for (const [key, values] of Object.entries(rule["조건"] ?? {})) {
+    if (!Array.isArray(values) || !values.length) fail(`조건 "${key}"는 값 목록이어야 합니다`);
+    if (key === "키워드에") {
+      when.keywordAny = values.map(v => String(v).trim()).filter(Boolean);
+    } else if (BUTTON_KEYS.includes(key)) {
+      const wrong = values.filter(v => !buttons[key].includes(v));
+      if (wrong.length) fail(`조건 "${key}" 값 ${wrong.join(", ")}이(가) 버튼선택지에 없습니다`);
+      when.buttons[key] = values;
+    } else {
+      fail(`조건 "${key}"는 쓸 수 없습니다(${BUTTON_KEYS.join("·")}·키워드에만 가능)`);
+    }
+  }
+  if (!Object.keys(when.buttons).length && !when.keywordAny.length) fail("조건이 하나도 없습니다");
+  // 근거의 "(… 비공개)" 같은 설명 괄호는 빼고 검사한다.
+  const checked = [rule["알림"], rule["확인 질문"], rule["근거"]].join(" ").replace(/\([^)]*비공개[^)]*\)/g, "");
+  if (NON_PUBLIC.test(checked)) fail("공개본에서 비공개인 조문·별표나 그 내용을 쓸 수 없습니다");
+  const [question, rest = ""] = String(rule["확인 질문"]).split("|").map(s => s.trim());
+  let parsed;
+  try {
+    parsed = toQuestion({ question, options: rest.split("/").map(s => s.trim()) });
+  } catch (problem) {
+    fail(`확인 질문 ${problem}`);
+  }
+  boundaryRules.push({ id: rule["번호"], when, alert: rule["알림"].trim(), question: parsed, basis: rule["근거"].trim() });
+}
+
+writeFileSync(OUT, JSON.stringify({ items, buttons, articles, defaultQuestions, boundaryRules }, null, 2) + "\n");
 console.log(
   `counsel-db.json: ${items.length}줄, 요강 조문 ${Object.keys(articles).length}개 변환` +
     (skipped.length ? `, 비공개라 뺀 줄 ${skipped.join(", ")}` : ""),

@@ -8,8 +8,9 @@ import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
 import { articleText, ruleLabels, ruleRefs } from "../lib/ruleRefs.ts";
+import { matchBoundaryRules, MAX_BOUNDARY_ALERTS } from "../lib/boundary.ts";
 
-const { items, articles, buttons, defaultQuestions } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
+const { items, articles, buttons, defaultQuestions, boundaryRules } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
 // 시나리오 표 한 줄: | 번호 | 연체 | 채무 | 단계 | 구분 | 주제 | 키워드 | 정답 | 확인하는 것 |
 const COLUMNS = ["id", "연체", "채무", "단계", "구분", "주제", "keyword", "answer"];
@@ -96,6 +97,34 @@ test("이관 메모: 확인한 내용 줄(질문 → 답)을 더하고, 길면 �
   assert.ok(memo.includes("확인 질문 12번은 무엇인가요? → 예"), "가장 최근 확인은 남음");
   assert.match(memo, /\(앞 \d+건 생략\)/);
   assert.ok(memo.endsWith(`다음 담당자에게: ${"가".repeat(MAX_NOTE_LENGTH)}`));
+});
+
+test("경계 규칙: 조건에 맞는 규칙만 파일 순서대로 최대 3개, 비공개 근거·내용 없음", () => {
+  const ids = buttonsSel => matchBoundaryRules(boundaryRules, { buttons: buttonsSel, keyword: "", mode: "fast" }).map(r => r.id);
+  assert.deepEqual(ids({ 주제: "신청·서류", 연체: "10~89일" }), ["B01"]);
+  assert.deepEqual(ids({ 주제: "감면·상환 조건", 채무: "둘 다" }), ["B03"]);
+  assert.deepEqual(ids({ 주제: "지원 자격", 단계: "신청 전" }), ["B04"]);
+  assert.deepEqual(ids({ 주제: "기타", 연체: "10~89일", 채무: "담보", 단계: "신청 전" }), ["B01", "B03", "B04"]);
+  assert.deepEqual(ids({ 주제: "기타", 연체: "90일 이상", 채무: "무담보" }), []);
+  // 키워드 조건(키워드에): 띄어쓰기를 무시하고 낱말 하나만 들어 있으면 맞음. 4개가 맞아도 3개까지만.
+  const extra = [
+    ...boundaryRules,
+    { id: "B99", when: { buttons: {}, keywordAny: ["예금"] }, alert: "x", question: boundaryRules[0].question, basis: "x" },
+  ];
+  const both = matchBoundaryRules(extra, { buttons: { 연체: "10~89일", 채무: "담보", 단계: "신청 전" }, keyword: "예 금 상계", mode: "fast" });
+  assert.equal(both.length, MAX_BOUNDARY_ALERTS);
+  assert.ok(matchBoundaryRules(extra, { buttons: {}, keyword: "예 금", mode: "fast" }).some(r => r.id === "B99"));
+  // 비공개(제11조②·별표 1~4·11·순자산 기준 등)는 알림·질문·근거 어디에도 없음
+  const nonPublic = /별표\s*(?:[1-4]|11)(?!\d)|제11조\s*(?:②|제2항)|제53조의[23]|순자산|6\.5억/;
+  for (const rule of boundaryRules) {
+    assert.ok(!nonPublic.test(JSON.stringify(rule)), `${rule.id}: 비공개 내용`);
+    for (const option of rule.question.options) {
+      if (!option.keyword && !Object.keys(option.set).length) continue;
+      const base = Object.fromEntries(Object.entries(rule.when.buttons).map(([k, v]) => [k, v[0]]));
+      const selection = { buttons: { 주제: "기타", ...base, ...option.set }, keyword: option.keyword, mode: "fast" };
+      assert.ok(recommend(items, selection).length > 0, `${rule.id}: "${option.label}" 다시 찾으면 0건`);
+    }
+  }
 });
 
 test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {

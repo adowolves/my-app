@@ -66,6 +66,26 @@ export type CounselData = {
   articles: Record<string, RuleArticle>;
   /** 주제 → 기본 확인 질문 3개(data/default-questions.json). 확인 질문이 빈 자료에 대신 쓴다. */
   defaultQuestions: Record<string, CheckQuestion[]>;
+  /** 경계 규칙(data/boundary-rules.json) */
+  boundaryRules: BoundaryRule[];
+};
+
+/**
+ * 경계 규칙 하나: 조건(상황 칩 값 조합)이 맞으면 추천 자료 위에 노란 띠로 알림을 띄우고,
+ * 확인 질문을 1순위 카드의 확인 질문 1번으로 올린다.
+ */
+export type BoundaryRule = {
+  id: string;
+  when: {
+    /** 버튼마다 맞는 값 목록. 적힌 버튼은 모두 맞아야 하고, 한 버튼 안에서는 값 하나만 맞으면 된다. */
+    buttons: Partial<Record<ButtonKey, string[]>>;
+    /** 키워드에 이 낱말 중 하나라도 들어 있어야 함(비어 있으면 따지지 않음) */
+    keywordAny: string[];
+  };
+  alert: string;
+  question: CheckQuestion;
+  /** 근거: 조문 번호 또는 FAQ 이름 */
+  basis: string;
 };
 
 /** 답변 길이: 빠른 답변 / 보통 답변 */
