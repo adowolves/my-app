@@ -7,8 +7,9 @@ import { recommend, recommendWithScope } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
+import { articleText, ruleRefs } from "../lib/ruleRefs.ts";
 
-const { items } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
+const { items, articles } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
 // 시나리오 표 한 줄: | 번호 | 연체 | 채무 | 단계 | 구분 | 주제 | 키워드 | 정답 | 확인하는 것 |
 const COLUMNS = ["id", "연체", "채무", "단계", "구분", "주제", "keyword", "answer"];
@@ -79,6 +80,29 @@ test("요강 기반 자료([규정] 044~)는 FAQ 원문 칸에 조문이 그대�
     assert.match(item.original, /^제\d+조/, `${item.id}: 조문으로 시작해야 함`);
     assert.ok(item.source.includes("위탁채권 관리업무요강"), `${item.id}: 출처`);
   }
+});
+
+test("관련 규정에서 요강 조문 번호를 읽음 (요지 속 조문은 세지 않음)", () => {
+  assert.deepEqual(ruleRefs("관리업무요강 제2조 제6·7호: 부실차주는 …"), [{ no: "제2조", items: [6, 7] }]);
+  assert.deepEqual(ruleRefs("관리업무요강 제23조, 제25조, 제30조"), [
+    { no: "제23조", items: [] },
+    { no: "제25조", items: [] },
+    { no: "제30조", items: [] },
+  ]);
+  assert.deepEqual(ruleRefs("새출발기금 지원 협약 / 관리업무요강 제27조의2: 제22조에 따라 …"), [{ no: "제27조의2", items: [] }]);
+  assert.deepEqual(ruleRefs("새출발기금 지원 협약"), []);
+});
+
+test("관련 규정이 가리키는 요강 조문은 모두 요강조문 시트에 있고, 호를 가리키면 그 호만 보여 줌", () => {
+  for (const item of items) {
+    for (const ref of ruleRefs(item.rule)) {
+      assert.ok(articles[ref.no], `${item.id}: ${ref.no} 조문이 요강조문 시트에 없음`);
+      for (const n of ref.items) assert.ok(articleText(articles[ref.no], [n]).includes(`\n${n}. `), `${item.id}: ${ref.no} 제${n}호 없음`);
+    }
+  }
+  const def = articleText(articles["제2조"], [26]);
+  assert.equal(def.split("\n").length, 2);
+  assert.ok(def.includes("“대상채권”"));
 });
 
 test("번호 순 정렬은 숫자 크기 기준 (\"7\"이 \"010\"보다 앞)", () => {

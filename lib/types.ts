@@ -29,10 +29,20 @@ export type CounselItem = {
   source: string;
 };
 
+/** 관리업무요강 조문 하나 (엑셀 "요강조문" 시트 한 줄) */
+export type RuleArticle = {
+  title: string;
+  /** 조문 전문(원문 그대로) */
+  text: string;
+  source: string;
+};
+
 /** 변환된 데이터 파일(data/counsel-db.json) 전체 */
 export type CounselData = {
   items: CounselItem[];
   buttons: ButtonOptions;
+  /** 조문 번호("제19조", "제5조의2") → 조문 */
+  articles: Record<string, RuleArticle>;
 };
 
 /** 답변 길이: 빠른 답변 / 보통 답변 */

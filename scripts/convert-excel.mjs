@@ -84,5 +84,20 @@ for (const row of readSheet("추천DB", ITEM_COLUMNS)) {
   });
 }
 
-writeFileSync(OUT, JSON.stringify({ items, buttons }, null, 2) + "\n");
-console.log(`counsel-db.json: ${items.length}줄 변환` + (skipped.length ? `, 비공개라 뺀 줄 ${skipped.join(", ")}` : ""));
+// 요강조문 시트: 관련 규정 칸의 조문 번호(예: "제19조")로 카드에 전문을 보여 주기 위해 넣는다. 공개 조문만 넣는다.
+const articles = {};
+for (const row of readSheet("요강조문", ["조문", "제목", "전문", "출처", "공개등급"])) {
+  if (!row["조문"] || row["공개등급"] !== "공개") continue;
+  const where = `요강조문 시트 ${row.__row}행(${row["조문"]})`;
+  if (!/^제\d+조(의\d+)?$/.test(row["조문"])) throw new Error(`${where}: 조문은 "제19조", "제5조의2"처럼 적어 주세요.`);
+  if (articles[row["조문"]]) throw new Error(`${where}: 같은 조문이 두 번 있습니다.`);
+  const empty = ["제목", "전문", "출처"].filter(column => !row[column]);
+  if (empty.length) throw new Error(`${where}: ${empty.map(c => `"${c}"`).join(", ")} 칸이 비어 있습니다.`);
+  articles[row["조문"]] = { title: row["제목"], text: row["전문"], source: row["출처"] };
+}
+
+writeFileSync(OUT, JSON.stringify({ items, buttons, articles }, null, 2) + "\n");
+console.log(
+  `counsel-db.json: ${items.length}줄, 요강 조문 ${Object.keys(articles).length}개 변환` +
+    (skipped.length ? `, 비공개라 뺀 줄 ${skipped.join(", ")}` : ""),
+);

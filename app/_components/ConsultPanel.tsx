@@ -109,7 +109,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
                 선택이 바뀌었어요 — [추천 받기]를 다시 눌러 주세요. 아래 자료는 바뀌기 전 선택의 결과예요.
               </p>
             )}
-            <ResultCards outcome={outcome} />
+            <ResultCards outcome={outcome} articles={data.articles} />
           </Section>
 
           {/* 질문문은 추천 결과가 나온 뒤에만 보인다. 0건이어도 보여서 사내 LLM에 바로 물을 수 있다. */}
