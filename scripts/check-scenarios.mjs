@@ -9,6 +9,7 @@ import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
 import { articleText, ruleLabels, ruleRefs } from "../lib/ruleRefs.ts";
 import { matchBoundaryRules, MAX_BOUNDARY_ALERTS } from "../lib/boundary.ts";
+import { findDoNotSay, findOutsideNumbers, guardAnswer, numbersIn } from "../app/api/answer/guard.ts";
 
 const { items, articles, buttons, defaultQuestions, boundaryRules } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
@@ -125,6 +126,51 @@ test("경계 규칙: 조건에 맞는 규칙만 파일 순서대로 최대 3개,
       assert.ok(recommend(items, selection).length > 0, `${rule.id}: "${option.label}" 다시 찾으면 0건`);
     }
   }
+});
+
+test("Claude 답 검사 ①: 하면 안 되는 말 문장이나 같은 뜻의 문장은 막고, 부정한 문장은 막지 않음", () => {
+  const phrase = "취약계층이면 빚을 전부 탕감받으세요";
+  assert.equal(findDoNotSay("확인해 보니 취약계층이면 빚을 전부 탕감받으세요.", [phrase]).length, 1, "그대로");
+  assert.equal(findDoNotSay("취약계층에 해당하시면 빚 전부를 탕감받을 수 있어요.", [phrase]).length, 1, "같은 뜻");
+  assert.equal(findDoNotSay("취약계층이라도 빚 전부를 탕감받는 것은 아닙니다.", [phrase]).length, 0, "반대 뜻");
+  assert.equal(findDoNotSay("취약계층은 추가 감면을 받을 수 있습니다.", [phrase]).length, 0, "낱말 일부만 같음");
+  // 부정이 들어 있는 하면 안 되는 말: "신청할 방법이 없어요" 류
+  const negative = "전산에 연체정보가 없으면 신청할 방법이 없어요";
+  assert.equal(findDoNotSay("전산에 연체정보가 없으면 신청할 방법이 없습니다.", [negative]).length, 1);
+  assert.equal(findDoNotSay("전산에 연체정보가 없어도 이의신청으로 신청할 방법이 있습니다.", [negative]).length, 0);
+  // 52줄 모두: 하면 안 되는 말을 그대로 쓰면 막히고, 정답 글(답변 요약·원문)은 어느 자료의 하면 안 되는 말에도 걸리지 않음
+  for (const item of items) {
+    assert.equal(findDoNotSay(`안내드리면 ${item.doNotSay}.`, [item.doNotSay]).length, 1, `${item.id}: 그대로 썼는데 통과`);
+    assert.equal(findDoNotSay(`${item.summary} ${item.original}`, [item.doNotSay]).length, 0, `${item.id}: 정답 글이 막힘`);
+    for (const other of items) assert.equal(findDoNotSay(item.summary, [other.doNotSay]).length, 0, `${item.id} 요약이 ${other.id}에 막힘`);
+  }
+});
+
+test("Claude 답 검사 ②: 참고 자료 본문에 없는 숫자(금액·일수·비율·조문 번호)는 막음", () => {
+  // 목록 번호·개수("3가지")는 세지 않고, 단위가 붙은 숫자·조문 번호·네 자리 이상·소수만 센다.
+  assert.deepEqual(numbersIn("1. 첫째\n2) 둘째 1,000만 원, 3.9%, 015번, 3가지, 제16조, 1660-1378, 2026.6.29."), [
+    "1000",
+    "3.9",
+    "16",
+    "1660",
+    "1378",
+    "2026.6.29",
+  ]);
+  const reference = "매입형은 신청일 다음 달 15일까지 취소, 취소하면 3개월(90일) 재신청 불가 (출처: 추천DB 015)";
+  assert.deepEqual(findOutsideNumbers("매입형은 다음 달 15일까지, 취소 후 90일(3개월) 재신청이 안 됩니다.", reference), []);
+  assert.deepEqual(findOutsideNumbers("30일 안에 취소하면 제16조에 따라 처리됩니다.", reference), ["30", "16"]);
+  // 실제 질문문으로: 자료 숫자만 쓴 답은 통과, 자료에 없는 숫자나 하면 안 되는 말이 있으면 막힘
+  const item = items.find(i => i.id === "015");
+  const question = buildQuestion({ buttons: { 주제: "신청·서류" }, keyword: "취소", mode: "fast" }, [item]);
+  const ok = guardAnswer("매입형은 신청일 다음 달 15일까지 취소할 수 있습니다. 취소하면 3개월(90일) 동안 다시 신청할 수 없습니다.", {
+    reference: question,
+    doNotSay: [item.doNotSay],
+  });
+  assert.deepEqual(ok, { ok: true });
+  const bad = guardAnswer("매입형은 신청일부터 60일 안에 취소할 수 있습니다.", { reference: question, doNotSay: [item.doNotSay] });
+  assert.deepEqual(bad, { ok: false, check: "근거 밖 숫자", found: ["60"] });
+  const said = guardAnswer(`안내드리면 ${item.doNotSay}.`, { reference: question, doNotSay: [item.doNotSay] });
+  assert.equal(said.ok ? "" : said.check, "하면 안 되는 말");
 });
 
 test("모든 줄에 하면 안 되는 말·넘길 곳이 있어 카드에 늘 보임", () => {

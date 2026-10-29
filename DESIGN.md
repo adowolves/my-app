@@ -182,6 +182,7 @@ app/_components/ (nice)
   ClaudeCard.tsx            Claude 상담카드(즉답 4단, 2026-10-29. 확인 질문은 추천 카드가 맡음)
   useCopy.ts                복사 공통 코드 (질문문·추천 단어·이관 메모)
 app/api/answer/route.ts     Claude로 바로 답변 서버 코드 (nice, 키는 서버에서만)
+app/api/answer/guard.ts     답 검사: 하면 안 되는 말·근거 밖 숫자가 있으면 차단 (서버 규칙만, 2026-10-29)
 app/api/card/route.ts       Claude 상담카드 서버 코드 (추천 자료만 근거, JSON 형식 답 검사)
 lib/llm.ts                  Claude 호출을 모은 단 한 곳 (주소·모델·키는 환경변수)
 lib/apiGuard.ts             두 API가 함께 쓰는 요청 검사·횟수 제한
