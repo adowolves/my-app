@@ -1,6 +1,6 @@
 "use client";
 // Claude 상담카드: [추천 받기]를 누르면 추천 카드와 함께 서버(/api/card)에 버튼 선택·키워드만 보내고,
-// ① 즉답(감정→사실→절차→대안)과 ② 확인 질문 3개를 받아 보여 준다. 실패해도 아래 추천 카드로 상담을 이어 간다.
+// 즉답(감정→사실→절차→대안)을 받아 보여 준다(확인 질문은 아래 추천 카드가 맡음). 실패해도 아래 추천 카드로 상담을 이어 간다.
 // 바뀐 추천마다 새로 만들도록 부모가 key를 바꿔 다시 그린다.
 import { useEffect, useState } from "react";
 import type { CardResponse, ClaudeCard as Card } from "@/app/api/card/route";
@@ -57,7 +57,7 @@ export default function ClaudeCard({ selection }: { selection: Selection }) {
   if (state.kind === "loading") {
     return (
       <div role="status" className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 text-sm text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-        <span className="animate-pulse">🤖 Claude가 상담카드(즉답·확인 질문)를 만드는 중… 아래 추천 자료로 먼저 안내하세요.</span>
+        <span className="animate-pulse">🤖 Claude가 즉답(감정→사실→절차→대안)을 만드는 중… 아래 추천 자료로 먼저 안내하세요.</span>
       </div>
     );
   }
@@ -80,7 +80,7 @@ export default function ClaudeCard({ selection }: { selection: Selection }) {
 
       <div className="flex flex-col gap-2 rounded-lg bg-white p-3 ring-1 ring-violet-200 dark:bg-zinc-950 dark:ring-violet-900">
         <p className="flex items-center justify-between gap-2 text-xs font-semibold text-violet-700 dark:text-violet-300">
-          ① 즉답 (감정 → 사실 → 절차 → 대안)
+          즉답 (감정 → 사실 → 절차 → 대안)
           <button
             type="button"
             onClick={() => copy(answer)}
@@ -95,15 +95,6 @@ export default function ClaudeCard({ selection }: { selection: Selection }) {
               <span className="pt-0.5 text-xs font-semibold text-violet-600 dark:text-violet-300">{step.label}</span>
               <span className="text-zinc-900 dark:text-zinc-100">{card[step.key]}</span>
             </li>
-          ))}
-        </ol>
-      </div>
-
-      <div className="flex flex-col gap-1.5 rounded-lg bg-white p-3 ring-1 ring-violet-200 dark:bg-zinc-950 dark:ring-violet-900">
-        <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">② 확인 질문 (민원인에게 물어보기)</p>
-        <ol className="flex list-decimal flex-col gap-1 pl-5">
-          {card.questions.map(q => (
-            <li key={q}>{q}</li>
           ))}
         </ol>
       </div>

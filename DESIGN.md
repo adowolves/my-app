@@ -179,7 +179,7 @@ lib/
 app/_components/ (nice)
   HandoffBox.tsx            이관 메모 입력·복사
   ClaudeAnswer.tsx          [Claude로 바로 답변] 버튼과 답 표시
-  ClaudeCard.tsx            Claude 상담카드(① 즉답 4단 ② 확인 질문 3개, 2026-10-29)
+  ClaudeCard.tsx            Claude 상담카드(즉답 4단, 2026-10-29. 확인 질문은 추천 카드가 맡음)
   useCopy.ts                복사 공통 코드 (질문문·추천 단어·이관 메모)
 app/api/answer/route.ts     Claude로 바로 답변 서버 코드 (nice, 키는 서버에서만)
 app/api/card/route.ts       Claude 상담카드 서버 코드 (추천 자료만 근거, JSON 형식 답 검사)
