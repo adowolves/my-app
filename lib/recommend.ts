@@ -7,6 +7,11 @@ export const MAX_RESULTS = 3;
 
 const FILTERS: FilterKey[] = ["연체", "채무", "단계", "구분", "주제"];
 
+/** 번호 순 비교. "7"과 "010"처럼 자릿수가 달라도 숫자 크기대로 줄 세운다. */
+function byId(a: CounselItem, b: CounselItem): number {
+  return a.id.localeCompare(b.id, undefined, { numeric: true });
+}
+
 /** 띄어쓰기를 무시하고 비교하기 위해 공백을 지운다(규칙 7). */
 function squash(text: string): string {
   return text.replace(/\s+/g, "");
@@ -34,12 +39,12 @@ export function recommend(items: CounselItem[], selection: Selection): CounselIt
   const keyword = squash(selection.keyword);
   const candidates = items.filter(item => matchesButtons(item, selection));
   if (!keyword) {
-    return [...candidates].sort((a, b) => a.id.localeCompare(b.id)).slice(0, MAX_RESULTS);
+    return [...candidates].sort(byId).slice(0, MAX_RESULTS);
   }
   return candidates
     .map(item => ({ item, score: keywordScore(item, keyword) }))
     .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id))
+    .sort((a, b) => b.score - a.score || byId(a.item, b.item))
     .slice(0, MAX_RESULTS)
     .map(({ item }) => item);
 }
