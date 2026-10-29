@@ -5,14 +5,38 @@ import type { ButtonKey, CounselItem, Selection } from "./types";
 export const MAX_HANDOFF_LENGTH = 300;
 export const MAX_NOTE_LENGTH = 50;
 
-const BUTTON_ORDER: ButtonKey[] = ["주제", "연체", "채무", "단계", "구분", "온도"];
+/** 자료마다 붙일 요강 조문. 예: { no: "제16조", title: "채무조정 신청의 취소" } */
+export type HandoffRule = { no: string; title: string };
 
-function compose(selection: Selection, items: CounselItem[], note: string, titleLimit: number): string {
+const BUTTON_ORDER: ButtonKey[] = ["주제", "연체", "채무", "단계", "구분", "온도"];
+const FAQ_SOURCE = "새출발기금 공식 FAQ";
+const RULE_SOURCE = "관리업무요강(2026.3.25. 시행본)";
+
+/** 자료 출처를 FAQ·요강 중 실제로 쓴 것만 적는다. */
+function sourceOf(items: CounselItem[], rules: HandoffRule[][]): string {
+  const names: string[] = [];
+  if (items.some(item => !item.question.startsWith("[규정]"))) names.push(FAQ_SOURCE);
+  if (rules.some(list => list.length) || items.some(item => item.question.startsWith("[규정]"))) names.push(RULE_SOURCE);
+  return names.join("·");
+}
+
+function compose(
+  selection: Selection,
+  items: CounselItem[],
+  rules: HandoffRule[][],
+  note: string,
+  titleLimit: number,
+  ruleTitles: boolean,
+): string {
   // 선택 6개를 모두 적는다. 고르지 않은 버튼은 "전체"로 적는다(규칙 1).
   const situation = BUTTON_ORDER.map(key => `${key} ${selection.buttons[key] || "전체"}`).join(" / ");
   const title = (q: string) => (titleLimit <= 0 ? "" : q.length > titleLimit ? ` ${q.slice(0, titleLimit)}…` : ` ${q}`);
+  // 자료마다 관련 요강 조문 번호와 제목을 붙인다. 조문이 없으면 붙이지 않는다.
+  const rule = (list: HandoffRule[] = []) =>
+    list.length ? ` [요강 ${list.map(r => (ruleTitles && r.title ? `${r.no}(${r.title})` : r.no)).join("·")}]` : "";
   const guided = items.length
-    ? items.map(item => `추천DB ${item.id}${title(item.question)}`).join(" / ") + " (출처: 새출발기금 공식 FAQ)"
+    ? items.map((item, i) => `추천DB ${item.id}${title(item.question)}${rule(rules[i])}`).join(" / ") +
+      ` (출처: ${sourceOf(items, rules)})`
     : "없음";
   return [
     "[새출발기금 상담 이관 메모]",
@@ -23,11 +47,16 @@ function compose(selection: Selection, items: CounselItem[], note: string, title
   ].join("\n");
 }
 
-/** 300자를 넘으면 자료 제목부터 줄이고, 그래도 넘으면 번호만 남긴다(규칙 2). note는 50자 이내로 검사된 값을 넘긴다. */
-export function buildHandoff(selection: Selection, items: CounselItem[], note: string): string {
-  for (let limit = 60; limit >= 0; limit -= 10) {
-    const text = compose(selection, items, note, limit);
-    if (text.length <= MAX_HANDOFF_LENGTH) return text;
+/**
+ * 300자를 넘으면 자료 제목부터 줄이고, 그래도 넘으면 조문 제목을 빼고 번호만 남긴다(규칙 2).
+ * note는 50자 이내로 검사된 값을 넘긴다. rules[i]는 items[i]의 관련 요강 조문이다.
+ */
+export function buildHandoff(selection: Selection, items: CounselItem[], note: string, rules: HandoffRule[][] = []): string {
+  for (const ruleTitles of [true, false]) {
+    for (let limit = 60; limit >= 0; limit -= 10) {
+      const text = compose(selection, items, rules, note, limit, ruleTitles);
+      if (text.length <= MAX_HANDOFF_LENGTH) return text;
+    }
   }
-  return compose(selection, items, note, 0).slice(0, MAX_HANDOFF_LENGTH);
+  return compose(selection, items, rules, note, 0, false).slice(0, MAX_HANDOFF_LENGTH);
 }

@@ -42,3 +42,8 @@ export function articleText(article: RuleArticle, items: number[]): string {
   const lines = article.text.split("\n");
   return [lines[0], ...lines.slice(1).filter(line => items.some(n => line.startsWith(`${n}. `)))].join("\n");
 }
+
+/** 이관 메모에 적을 조문 번호와 제목. 요강조문 시트에 없는 조문은 번호만 남긴다. */
+export function ruleLabels(rule: string, articles: Record<string, RuleArticle>): { no: string; title: string }[] {
+  return ruleRefs(rule).map(ref => ({ no: ref.no, title: articles[ref.no]?.title ?? "" }));
+}

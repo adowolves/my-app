@@ -7,7 +7,7 @@ import { recommend, recommendWithScope } from "../lib/recommend.ts";
 import { hasPersonalNumber, checkText, validateSelection } from "../lib/validate.ts";
 import { buildQuestion, MAX_QUESTION_LENGTH } from "../lib/buildQuestion.ts";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "../lib/buildHandoff.ts";
-import { articleText, ruleRefs } from "../lib/ruleRefs.ts";
+import { articleText, ruleLabels, ruleRefs } from "../lib/ruleRefs.ts";
 
 const { items, articles } = JSON.parse(readFileSync(new URL("../data/counsel-db.json", import.meta.url), "utf8"));
 
@@ -204,11 +204,24 @@ test("이관 메모: 모든 시나리오에서 300자 이내, 안내한 자료 �
   const note = "가".repeat(MAX_NOTE_LENGTH);
   for (const s of scenarios) {
     const results = recommend(items, { ...s.selection, buttons: { ...s.selection.buttons, 온도: "악성" } });
-    const memo = buildHandoff(s.selection, results, note);
+    const memo = buildHandoff(s.selection, results, note, results.map(item => ruleLabels(item.rule, articles)));
     assert.ok(memo.length <= MAX_HANDOFF_LENGTH, `${s.id}: ${memo.length}자`);
-    for (const item of results) assert.ok(memo.includes(`추천DB ${item.id}`), `${s.id}: ${item.id} 빠짐`);
+    for (const item of results) {
+      assert.ok(memo.includes(`추천DB ${item.id}`), `${s.id}: ${item.id} 빠짐`);
+      for (const ref of ruleRefs(item.rule)) assert.ok(memo.includes(ref.no), `${s.id}: ${item.id}의 ${ref.no} 빠짐`);
+    }
     assert.ok(memo.includes(`다음 담당자에게: ${note}`));
   }
+});
+
+test("이관 메모: 자료마다 요강 조문 번호·제목을 붙이고, 출처에 FAQ와 요강을 나눠 적음", () => {
+  const picked = ["039", "025", "047"].map(id => items.find(item => item.id === id));
+  const selection = { buttons: { 주제: "이의신청·정보변경" }, keyword: "재산가 산정" };
+  const memo = buildHandoff(selection, picked, "", picked.map(item => ruleLabels(item.rule, articles)));
+  assert.ok(memo.length <= MAX_HANDOFF_LENGTH, `${memo.length}자`);
+  assert.match(memo, /추천DB 039 .*\[요강 제59조\(보전조치의 취하\)\]/);
+  assert.match(memo, /추천DB 047 .*\[요강 제35조\(채무조정의 재약정\)\]/);
+  assert.ok(memo.includes("새출발기금 공식 FAQ·관리업무요강"), "출처에 요강 빠짐");
 });
 
 test("이관 메모: 다음 담당자 칸도 숫자 6자리 이상을 막는 같은 검사를 씀", () => {

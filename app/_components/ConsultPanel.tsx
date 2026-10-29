@@ -121,7 +121,7 @@ export default function ConsultPanel({ data }: { data: CounselData }) {
 
           {outcome.kind === "done" && !stale && (
             <Section title="이관 메모" hint="다른 직원에게 넘길 때">
-              <HandoffBox selection={outcome.selection} results={outcome.items} />
+              <HandoffBox selection={outcome.selection} results={outcome.items} articles={data.articles} />
             </Section>
           )}
         </div>

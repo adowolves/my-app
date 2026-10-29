@@ -2,19 +2,23 @@
 // 이관 메모(nice): "다음 담당자에게" 한 줄을 받아 메모를 만들고 복사한다. 앱은 저장하지 않는다. PRD 5절 nice 이관 메모
 import { useRef, useState } from "react";
 import { buildHandoff, MAX_HANDOFF_LENGTH, MAX_NOTE_LENGTH } from "@/lib/buildHandoff";
-import type { CounselItem, Selection } from "@/lib/types";
+import { ruleLabels } from "@/lib/ruleRefs";
+import type { CounselItem, RuleArticle, Selection } from "@/lib/types";
 import { checkText, INPUT_ERROR_MESSAGE } from "@/lib/validate";
 import { useCopy } from "./useCopy";
 
 type Props = {
   selection: Selection;
   results: CounselItem[];
+  articles: Record<string, RuleArticle>;
 };
 
-export default function HandoffBox({ selection, results }: Props) {
+export default function HandoffBox({ selection, results, articles }: Props) {
   const [note, setNote] = useState("");
   const noteError = checkText(note, MAX_NOTE_LENGTH);
-  const memo = buildHandoff(selection, results, noteError ? "" : note);
+  // 자료마다 관련 요강 조문 번호·제목을 메모에 붙인다.
+  const rules = results.map(item => ruleLabels(item.rule, articles));
+  const memo = buildHandoff(selection, results, noteError ? "" : note, rules);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const { copy, statusFor } = useCopy();
   const copyStatus = statusFor(memo);
