@@ -11,6 +11,46 @@ import { MAX_KEYWORD_LENGTH, validateSelection } from "@/lib/validate";
 /** 20초가 지나면 실패로 보고 사내 LLM 복사로 안내한다(규칙 4). 재시도하지 않는다. */
 const TIMEOUT_MS = 20_000;
 
+/** 배포 환경의 기본 실행 제한이 20초보다 짧아 답이 중간에 끊기지 않게, 20초 대기에 여유를 둔다(초 단위). */
+export const maxDuration = 30;
+
+/**
+ * 요청 횟수 제한: 같은 접속 주소에서 1분에 10번까지.
+ * 배포 주소가 알려져도 API 사용료가 크게 나가지 않게 막는다. 서버 메모리에만 세므로 서버가 여러 대로 늘면 대마다 따로 센다.
+ */
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
+const recentRequests = new Map<string, number[]>();
+
+function isRateLimited(request: Request): boolean {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
+  const now = Date.now();
+  const recent = (recentRequests.get(ip) ?? []).filter(time => now - time < RATE_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT) {
+    recentRequests.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  recentRequests.set(ip, recent);
+  // 오래된 접속 주소 기록이 쌓이지 않게 가끔 비운다.
+  if (recentRequests.size > 1000) {
+    for (const [key, times] of recentRequests) if (now - times[times.length - 1] >= RATE_WINDOW_MS) recentRequests.delete(key);
+  }
+  return false;
+}
+
+/** 다른 사이트의 화면에서 이 API를 부르지 못하게, 보낸 곳(Origin)이 이 앱 주소와 같은지 본다. */
+function isOtherSite(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 const SYSTEM_PROMPT =
   "당신은 새출발기금 상담 직원을 돕는 도우미입니다. 질문문에 있는 참고 자료(새출발기금 공식 FAQ)를 근거로 한국어로 답하세요. " +
   "자료 밖의 내용은 '추측'이라고 표시하고, 민원인의 개인정보는 묻거나 지어내지 마세요. " +
@@ -43,6 +83,8 @@ function parseSelection(body: unknown): Selection | null {
 }
 
 export async function POST(request: Request) {
+  if (isOtherSite(request)) return fail("이 앱 화면에서만 쓸 수 있어요.", 403);
+  if (isRateLimited(request)) return fail("요청이 많아 잠시 뒤에 다시 시도해야 해요.", 429);
   const selection = parseSelection(await request.json().catch(() => null));
   if (!selection || validateSelection(selection)) return fail("입력이 올바르지 않아요.", 400);
 
